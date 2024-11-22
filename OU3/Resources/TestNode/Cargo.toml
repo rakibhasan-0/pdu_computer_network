@@ -1,0 +1,18 @@
+[package]
+name = "ou2"
+version = "0.1.0"
+authors = ["Klas <klasa@cs.umu.se>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+structopt = "0.3"
+csv = "1.1"
+serde = { version = "1.0.115", features = ["derive"] }
+ctrlc = "3.1.6"
+
+
+[dependencies.mio]
+version = "0.8.9"
+features = ["net", "os-poll"]
