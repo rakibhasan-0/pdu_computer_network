@@ -19,6 +19,12 @@ Key functionalities:
 
 */
 
+
+/*
+Steps:
+-Implement sockets
+-STUN_LOOKUP in order to test communication with the tracker
+*/
 int main(int argc, char* argv[]) {
     return 0;
 }
