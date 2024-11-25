@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <netdb.h>
-#include <pdu.h>
+#include "../../../pdu.h"
 
 /*
 Key functionalities:
@@ -69,6 +69,7 @@ int main(int argc, char* argv[]) {
     struct STUN_LOOKUP_PDU stun_lookup_pdu;
     stun_lookup_pdu.type = STUN_LOOKUP;
     sendto(sockfd, &stun_lookup_pdu, sizeof(stun_lookup_pdu), 0, res->ai_addr, res->ai_addrlen);
+    printf("Tracker address: %u\n", stun_lookup_pdu);
 
     // receive a STUN_RESPONSE PDU from the tracker
     struct STUN_RESPONSE_PDU stun_response_pdu;
