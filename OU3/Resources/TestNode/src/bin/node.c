@@ -1,3 +1,13 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <netdb.h>
+#include <pdu.h>
+
 /*
 Key functionalities:
 
@@ -26,5 +36,35 @@ Steps:
 -STUN_LOOKUP in order to test communication with the tracker
 */
 int main(int argc, char* argv[]) {
+
+    int status;
+    struct addrinfo hints;
+    struct addrinfo *res;
+
+    if(argc != 3) {
+        fprintf(stderr, "Usage: %s <hostname> <port>\n", argv[0]);
+        return 1;
+    }
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
+
+    status = getaddrinfo(argv[1], argv[2], &hints, &res);
+    if (status != 0) {
+        fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
+        return 1;
+    }
+
+    int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+
+    if (sockfd == -1) {
+        perror("socket");
+        return 1;
+    }
+
+    // send a STUN_LOOKUP PDU to the tracker
+
+
     return 0;
 }
