@@ -115,7 +115,8 @@ int main(int argc, char* argv[]) {
 
     while(1){
         if(net_get_node_response.address == 0 && net_get_node_response.port == 0) {
-        printf("The network is empty\n");
+            printf("The network is empty\n");
+        }
     }
 
     
