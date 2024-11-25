@@ -10,3 +10,15 @@ Key functionalities:
 
 - Alive messages: Nodes periodically send NET_ALIVE messages to the tracker to indicate they are still active.
 */
+
+/*
+    Create a Tracker Communication Module:
+        Write a basic UDP client to send/receive PDUs to/from the tracker.
+        Implement STUN_LOOKUP to get the public address.
+        Implement NET_GET_NODE to get information about other nodes.
+
+*/
+
+int main(int argc, char* argv[]) {
+    return 0;
+}
