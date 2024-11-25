@@ -58,12 +58,25 @@ int main(int argc, char* argv[]) {
 
     int sockfd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 
+    int bind_status = bind(sockfd, res->ai_addr, res->ai_addrlen);
+
     if (sockfd == -1) {
         perror("socket");
         return 1;
     }
 
     // send a STUN_LOOKUP PDU to the tracker
+    struct STUN_LOOKUP_PDU stun_lookup_pdu;
+    stun_lookup_pdu.type = STUN_LOOKUP;
+    sendto(sockfd, &stun_lookup_pdu, sizeof(stun_lookup_pdu), 0, res->ai_addr, res->ai_addrlen);
+
+    // receive a STUN_RESPONSE PDU from the tracker
+    struct STUN_RESPONSE_PDU stun_response_pdu;
+    recvfrom(sockfd, &stun_response_pdu, sizeof(stun_response_pdu), 0, res->ai_addr, &res->ai_addrlen);
+
+    if(stun_response_pdu.type == STUN_RESPONSE) {
+        printf("Public address: %u\n", stun_response_pdu.address);
+    }
 
 
     return 0;
