@@ -68,21 +68,20 @@ struct Node{
     unsigned int sockfd_d; // TCP connection to predecessor
 
     // state handler aka function pointer
-    int (*state_handler)(Node*);
+    int (*state_handler)(void*, void*);
 
 };
 
 
-int q1_state(Node* node);
-int q2_state(Node* node);
-int q3_state(Node* node);
-int q4_state(Node* node);
-int q5_state(Node* node);
-int q6_state(Node* node);
-int q7_state(Node* node);
-int q8_state(Node* node);
+int q1_state(void* n, void* data);
+int q2_state(void* n, void* data);
+int q3_state(void* n, void* data);
+int q4_state(void* n, void* data);
+int q6_state(void* n, void* data);
+int q7_state(void* n, void* data);
+int q5_state(void* n, void* data);
 
-typedef int (*state_handler[])(Node *); // function pointer to manage the states
+typedef int (*state_handler[])(void*, void*); // function pointer to manage the states
 state_handler state_handlers = {q1_state, q2_state, q3_state, q4_state, q5_state, q6_state, q7_state};
 
 
@@ -122,7 +121,7 @@ int main(int argc, char* argv[]) {
     node->tracker_port = atoi(argv[2]);
     node->tracker_addr = res;
     node->state_handler = state_handlers[0]; // we are initializing the function pointer to point to the q1 state.
-    node->state_handler(node); // now we are incoking the function by using the function pointer.
+    node->state_handler(node, NULL); // now we are incoking the function by using the function pointer.
 
 
     freeaddrinfo(node->tracker_addr);
@@ -134,7 +133,9 @@ int main(int argc, char* argv[]) {
 
 // function to handle q1 state
 // it creates a socket for the A, send STUN_LOOKUP request to the tracker and move to the next state.
-int q1_state(Node *node){
+int q1_state(void* n, void* data){
+
+    Node* node = (Node*)n;
 
     printf("q1 state\n");
     struct STUN_LOOKUP_PDU stun_lookup;
@@ -165,14 +166,15 @@ int q1_state(Node *node){
 
     // move to the next state q2
     node->state_handler = state_handlers[1];
-    node->state_handler(node);
+    node->state_handler(node, NULL);
 }
 
 // function to handle q2 state
 // that following function will recieve respons from the tracker, based on the information it
 // will move to the next state.
-int q2_state(Node *node){
+int q2_state(void* n, void* data){
 
+    Node* node = (Node*)n;
     // we will create a buffer to store the response from the tracker
     printf("q2 state\n");
     char buffer[1024];
@@ -202,10 +204,12 @@ int q2_state(Node *node){
 
     // move to the next state q3
     node->state_handler = state_handlers[2];
-    node->state_handler(node);
+    node->state_handler(node, NULL);
 }
 
-int q3_state(Node *node){
+int q3_state(void* n, void* data){
+
+    Node* node = (Node*)n;
     printf("q3 state\n");
     // we will send NET_GET_NODE to the tracker
     struct NET_GET_NODE_PDU net_get_node = {0};
@@ -249,7 +253,12 @@ int q3_state(Node *node){
         if (net_get_node_response.address == 0 && net_get_node_response.port == 0){
             printf("Empty response from the Tracker\n");
             node-> state_handler = state_handlers[3];
-            node->state_handler(node);
+            node->state_handler(node, NULL);
+        }else{
+            // we will move to the state q7, since the respons is not empty.
+            // what I guess that net_get_node_response will contain the information about a node in the network.
+            // it will contain the address and the port of the node.
+            // the main task of the 
         }
 
         
@@ -257,12 +266,14 @@ int q3_state(Node *node){
 
     // move to the next state q4
     node->state_handler = state_handlers[3];
-    node->state_handler(node);
+    node->state_handler(node, NULL);
 }
 
 // state number 4, we dont know anything about this state yet.
 // 
-int q4_state(Node *node){
+int q4_state(void* n, void* data){
+
+    Node* node = (Node*)n;
     printf("q4 state\n");
     // the node itself will be its predecessor and successor
     // the initialization of the 
@@ -273,14 +284,15 @@ int q4_state(Node *node){
 
     // start sending alive messages to the tracker
     node->state_handler = state_handlers[5]; // it will move to the q6 state
-    node->state_handler(node);
+    node->state_handler(node, NULL);
 
 }
 
 
-// based on the graph, I(gazi) think that state 6 kinda core since most states are being handled from here.
-int q6_state(Node* node){
+// based on the graph, I(gazi) think that state_6 kinda core since most states are being handled from here.
+int q6_state(void* n, void* data){
 
+    Node* node = (Node*)n;
     printf("q6 state\n");
     struct NET_ALIVE_PDU net_alive = {0};
     net_alive.type = NET_ALIVE;
@@ -290,7 +302,7 @@ int q6_state(Node* node){
     
 
     while(1){
-        sleep(5);
+        sleep(7);
         int send_status = sendto(node->sockfd_a, &net_alive, sizeof(net_alive), 0,
                                  node->tracker_addr->ai_addr, node->tracker_addr->ai_addrlen);
         
@@ -304,19 +316,15 @@ int q6_state(Node* node){
 
 
 
-int q7_state(Node* node){
-
-}
-
-
-int q8_state(Node* node){
+int q7_state(void* n, void* data){
+    printf("q7 state\n");
     printf("nothing to do here\n");
     return 0;
 
 }
 
 
-int q5_state(Node* node){
+int q5_state(void* n, void* data){
     printf("q5 state\n");
     printf("nothing to do here\n");
     return 0;
