@@ -72,7 +72,7 @@ struct Node{
 
 };
 
-
+// the reason we have choosen two function parameters so that we have the flexibility to pass the data between the states.
 int q1_state(void* n, void* data);
 int q2_state(void* n, void* data);
 int q3_state(void* n, void* data);
@@ -229,7 +229,7 @@ int q3_state(void* n, void* data){
     }
 
     // net_get_node_response will store the response from the tracker
-    struct NET_GET_NODE_RESPONSE_PDU net_get_node_response = {0};
+    struct NET_GET_NODE_RESPONSE_PDU* net_get_node_response = calloc(1, sizeof(struct NET_GET_NODE_RESPONSE_PDU)); // as we are senfing to the other function.
     // we will create a buffer to store the response from the tracker
     char buffer[1024];
     memset(buffer, 0, sizeof(buffer));
@@ -239,19 +239,20 @@ int q3_state(void* n, void* data){
                             &node->tracker_addr->ai_addrlen);
 
     // removing the padding from the buffer and storing it in the net_get_node_response
-    memcpy(&net_get_node_response.type, buffer, sizeof(net_get_node_response.type));
-    memcpy(&net_get_node_response.address, buffer + sizeof(net_get_node_response.type), sizeof(net_get_node_response.address));
-    memcpy(&net_get_node_response.port, buffer + sizeof(net_get_node_response.type) + sizeof(net_get_node_response.address),
-           sizeof(net_get_node_response.port));
+    memcpy(&net_get_node_response->type, buffer, sizeof(net_get_node_response->type));
+    memcpy(&net_get_node_response->address, buffer + sizeof(net_get_node_response->type), sizeof(net_get_node_response->address));
+    memcpy(&net_get_node_response->port, buffer + sizeof(net_get_node_response->type) + sizeof(net_get_node_response->address),
+           sizeof(net_get_node_response->port));
 
     // check if the response is NET_GET_NODE_RESPONSE is empty
-    if (net_get_node_response.type == NET_GET_NODE_RESPONSE){
+    if (net_get_node_response->type == NET_GET_NODE_RESPONSE){
         struct in_addr addr;
-        addr.s_addr = net_get_node_response.address;
+        addr.s_addr = net_get_node_response->address;
         printf("Node IP: %s\n", inet_ntoa(addr));
-        printf("Node Port: %d\n", ntohs(net_get_node_response.port));
+        printf("Node Port: %d\n", ntohs(net_get_node_response->port));
         if (net_get_node_response.address == 0 && net_get_node_response.port == 0){
             printf("Empty response from the Tracker\n");
+            // move to the state 4
             node-> state_handler = state_handlers[3];
             node->state_handler(node, NULL);
         }else{
@@ -259,14 +260,12 @@ int q3_state(void* n, void* data){
             // what I guess that net_get_node_response will contain the information about a node in the network.
             // it will contain the address and the port of the node.
             // the main task of the 
+            node->state_handler = state_handlers[6]; // now we are going to the q7 state.
+            node->state_handler(node, net_get_node_response);
         }
 
         
     }
-
-    // move to the next state q4
-    node->state_handler = state_handlers[3];
-    node->state_handler(node, NULL);
 }
 
 // state number 4, we dont know anything about this state yet.
@@ -315,11 +314,17 @@ int q6_state(void* n, void* data){
 }
 
 
-
+// that state will NET_JOIN to the node that we got from the tracker.
+// what I think i will start traversing the networ from the node that we got from the tracker.
+// we will make the node the predecessor the founded node of the node.
 int q7_state(void* n, void* data){
     printf("q7 state\n");
-    printf("nothing to do here\n");
-    return 0;
+    
+    // we get respons from the tracker in the get_node_response it contains the address, which is in the network.
+    // but the question is how the node in network recieves the messge from the new node via udp
+    // it does not know about the new nodes address and port before recieving the message.
+
+
 
 }
 
