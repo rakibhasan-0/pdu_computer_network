@@ -11,6 +11,7 @@
 #include <stdbool.h>
 #include "../../../pdu.h"
 
+
 /*
 Key functionalities:
 
@@ -45,12 +46,12 @@ typedef struct Node Node;
 // Node structure, but it may need to change in future. So far soo good.
 struct Node{
 
-    struct Node* predecessor;
+    struct Node* predecessor; // we dont need the port of the predecessor, because we can connect the port by through the node and its pointer.
     struct Node* successor;
-    uint16_t hash_range_start;
-    uint16_t hash_range_end;
+    uint8_t hash_range_start; // hash will range in between 0 to 255.
+    uint8_t hash_range_end;
     uint32_t port;
-    uint32_t public_ip;
+    struct in_addr public_ip;
     bool is_alive;
 
     // tracker's socket address
@@ -76,9 +77,13 @@ int q1_state(Node* node);
 int q2_state(Node* node);
 int q3_state(Node* node);
 int q4_state(Node* node);
+int q5_state(Node* node);
+int q6_state(Node* node);
+int q7_state(Node* node);
+int q8_state(Node* node);
 
 typedef int (*state_handler[])(Node *); // function pointer to manage the states
-state_handler state_handlers = {q1_state, q2_state, q3_state, q4_state};
+state_handler state_handlers = {q1_state, q2_state, q3_state, q4_state, q5_state, q6_state, q7_state};
 
 
 /*
@@ -191,6 +196,7 @@ int q2_state(Node *node){
     // convert the address to the network byte order
     if (stun_response.type == STUN_RESPONSE){
         struct in_addr addr = {stun_response.address};
+        node->public_ip = addr; // we are storing the public ip address of the node.
         printf("Public IP: %s\n", inet_ntoa(addr));
     }
 
@@ -203,6 +209,10 @@ int q3_state(Node *node){
     printf("q3 state\n");
     // we will send NET_GET_NODE to the tracker
     struct NET_GET_NODE_PDU net_get_node = {0};
+    // just for check if the public ip is stored in the node
+    //printf("Public IP from state 3: %s\n", inet_ntoa(node->public_ip));
+
+
     net_get_node.type = NET_GET_NODE;
 
     // it is time to send the NET_GET_NODE to the tracker via UDP
@@ -237,9 +247,12 @@ int q3_state(Node *node){
         printf("Node IP: %s\n", inet_ntoa(addr));
         printf("Node Port: %d\n", ntohs(net_get_node_response.port));
         if (net_get_node_response.address == 0 && net_get_node_response.port == 0){
-            printf("Empty response\n");
-            printf("nothing to do right now\n");
+            printf("Empty response from the Tracker\n");
+            node-> state_handler = state_handlers[3];
+            node->state_handler(node);
         }
+
+        
     }
 
     // move to the next state q4
@@ -248,7 +261,65 @@ int q3_state(Node *node){
 }
 
 // state number 4, we dont know anything about this state yet.
+// 
 int q4_state(Node *node){
     printf("q4 state\n");
-    return 0;
+    // the node itself will be its predecessor and successor
+    // the initialization of the 
+    node->predecessor = node;
+    node->successor = node;
+    node->hash_range_start = 0;
+    node->hash_range_end = 255; // since there is only one node. 
+
+    // start sending alive messages to the tracker
+    node->state_handler = state_handlers[5]; // it will move to the q6 state
+    node->state_handler(node);
+
 }
+
+
+// based on the graph, I(gazi) think that state 6 kinda core since most states are being handled from here.
+int q6_state(Node* node){
+
+    printf("q6 state\n");
+    struct NET_ALIVE_PDU net_alive = {0};
+    net_alive.type = NET_ALIVE;
+    // send the alive message to the tracker
+    int send_status = sendto(node->sockfd_a, &net_alive, sizeof(net_alive), 0,
+                             node->tracker_addr->ai_addr, node->tracker_addr->ai_addrlen);
+    
+
+    while(1){
+        sleep(5);
+        int send_status = sendto(node->sockfd_a, &net_alive, sizeof(net_alive), 0,
+                                 node->tracker_addr->ai_addr, node->tracker_addr->ai_addrlen);
+        
+        node->is_alive = true;
+        printf("Alive message sent to the tracker \n");
+
+    }
+
+
+}
+
+
+
+int q7_state(Node* node){
+
+}
+
+
+int q8_state(Node* node){
+    printf("nothing to do here\n");
+    return 0;
+
+}
+
+
+int q5_state(Node* node){
+    printf("q5 state\n");
+    printf("nothing to do here\n");
+    return 0;
+
+} 
+
