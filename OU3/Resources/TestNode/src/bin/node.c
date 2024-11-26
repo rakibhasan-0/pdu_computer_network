@@ -73,18 +73,29 @@ int main(int argc, char* argv[]) {
     }
 
     // receive a STUN_RESPONSE PDU from the tracker
-    struct STUN_RESPONSE_PDU stun_response;
-    int rcv_status = recvfrom(sockfd, &stun_response, sizeof(stun_response), 0, res->ai_addr, &res->ai_addrlen);
-    if(rcv_status == -1) {
+    char buffer[1024];
+    struct STUN_RESPONSE_PDU stun_response = {0};
+
+    int rcv_status = recvfrom(sockfd, buffer, sizeof(buffer), 0, res->ai_addr, &res->ai_addrlen);
+    if (rcv_status == -1) {
         perror("it failed to receive the STUN_RESPONSE PDU");
         return 1;
     }
 
-    
-    if (stun_response.type == STUN_RESPONSE) {
-        struct in_addr addr = {stun_response.address};
-        printf("Public IP: %s\n", inet_ntoa(addr));
-    }
+    printf("Received %d bytes\n", rcv_status);
+    memcpy(&stun_response.type, buffer, sizeof(stun_response.type));
+    memcpy(&stun_response.address, buffer + sizeof(stun_response.type), sizeof(stun_response.address));
+
+    stun_response.address = ntohl(stun_response.address);
+
+    // Print results
+    printf("Type: %d\n", stun_response.type);
+    printf("Address: %d\n", stun_response.address);
+
+    struct in_addr addr = {stun_response.address};
+    addr.s_addr = ntohl(addr.s_addr);
+    printf("Public IP: %s\n", inet_ntoa(addr));
+
 
 
     // it is time to node send NET_GET_NODE to the tracker
@@ -97,7 +108,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    struct NET_GET_NODE_RESPONSE_PDU net_get_node_response;
+    struct NET_GET_NODE_RESPONSE_PDU net_get_node_response = {0};
     rcv_status = recvfrom(sockfd, &net_get_node_response, sizeof(net_get_node_response), 0, res->ai_addr, &res->ai_addrlen);
     if(rcv_status == -1) {
         perror("it failed to receive the NET_GET_NODE_RESPONSE PDU");
@@ -111,14 +122,6 @@ int main(int argc, char* argv[]) {
         printf("Node IP: %s\n", inet_ntoa(addr));
         printf("Node Port: %d\n", ntohs(net_get_node_response.port));
     }
-
-
-    while(1){
-        if(net_get_node_response.address == 0 && net_get_node_response.port == 0) {
-            printf("The network is empty\n");
-        }
-    }
-
     
     // since it is empty, we can sent 
 
