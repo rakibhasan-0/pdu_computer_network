@@ -349,7 +349,28 @@ int q6_state(void* n, void* data){
 // we will make the node the predecessor the founded node of the node.
 int q7_state(void* n, void* data){
     printf("q7 state\n");
-    
+    Node* node = (Node*)n;
+	struct NET_GET_NODE_RESPONSE_PDU net_get_node_response;
+	
+	//Skaffa successor infon
+
+	// Create socket for communicating with the active node via TCP
+	node->sockfd_b = socket();
+    if (node->sockfd_b == -1) {
+        perror("socket failure");
+        return 1;
+    }
+
+	int connect_status = connect(node->sockfd_b);
+    if (connect_status == -1) {
+        perror("connect failure");
+        return 1;
+    }
+
+	//NET_JOIN
+
+
+
     // we get respons from the tracker in the get_node_response it contains the address, which is in the network.
     // but the question is how the node in network recieves the messge from the new node via udp
     // it does not know about the new nodes address and port before recieving the message.
