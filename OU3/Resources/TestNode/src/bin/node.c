@@ -32,6 +32,35 @@ Key functionalities:
 
 
 /*
+    the node, shall have a structure that contains information such as  the predecessor, 
+    the successor, the hash range, the port number, its public IP address, is alive many other things that I cannot imagine right now.
+    The node will be treated as the doubly linked list.
+*/
+
+
+// Node structure, but it may need to change in future. So far soo good.
+struct Node{
+
+    struct Node* predecessor;
+    struct Node* successor;
+    uint16_t hash_range_start;
+    uint16_t hash_range_end;
+    uint32_t port;
+    uint32_t public_ip;
+    boolean is_alive;
+
+    // Socket ID for A is used to communicate (sending/reciving) with tracker and outside world
+    unsigned int sockfd_a; // UDP connection to tracker, and clinet (most probably)
+    // Socket ID for B, is used to communicate(sending/reciving) with the successor.
+    unsigned int sockfd_b; // TCP connection to successor
+    // Socket ID for C,is used to communicate(sending/reciving) with new conections.
+    unsigned int sockfd_c; // TCP connection accepting new connections
+    // Socket ID for D is used to communicate(sending/reciving) with the predecessor.
+    unsigned int sockfd_d; // TCP connection to predecessor
+
+}
+
+/*
 Steps:
 -Implement sockets
 -STUN_LOOKUP in order to test communication with the tracker
