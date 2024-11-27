@@ -9,6 +9,8 @@
 #include <arpa/inet.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <poll.h>
+#include <time.h>
 #include "../../../pdu.h"
 
 
@@ -242,6 +244,7 @@ int q3_state(void* n, void* data){
     if (net_get_node_response->type == NET_GET_NODE_RESPONSE){
         struct in_addr addr;
         addr.s_addr = net_get_node_response->address;
+
         printf("Node IP: %s\n", inet_ntoa(addr));
         printf("Node Port: %d\n", ntohs(net_get_node_response->port));
         if (net_get_node_response->address == 0 && net_get_node_response->port == 0){
@@ -300,112 +303,131 @@ int q6_state(void* n, void* data){
     printf("Binding to IP: %s, Port: %d\n",
        inet_ntoa(node->public_ip), node->port);
 
+    struct pollfd poll_fd;
+    poll_fd.fd = node->sockfd_a;
+    poll_fd.events = POLLIN;
+
+    // time interval for the alive message
+    int timeout = 6;
+    time_t last_time = time(NULL);
 
     while(1){
-        sleep(7);
-        int send_status = sendto(node->sockfd_a, &net_alive, sizeof(net_alive), 0,
-                                 node->tracker_addr->ai_addr, node->tracker_addr->ai_addrlen);
+
+        time_t current_time = time(NULL);
+
+        if (current_time - last_time >= timeout){
+            int send_status = sendto(node->sockfd_a, &net_alive, sizeof(net_alive), 0,
+                                     node->tracker_addr->ai_addr, node->tracker_addr->ai_addrlen);
+            last_time = current_time;
+        }
         
-        // now we will receive response from the new node that contains the information about the NET_JOIN
-        char buffer[1024];
-        memset(buffer, 0, sizeof(buffer));
         struct sockaddr_in sender_addr;
         socklen_t sender_addr_len = sizeof(sender_addr);
         memset(&sender_addr, 0, sizeof(sender_addr));
 
-        int rcv_data = recvfrom(node->sockfd_a, buffer, sizeof(buffer), 0, (struct sockaddr*)&sender_addr, &sender_addr_len);
-
-        // the buffer shall recive the new node's information.
-        // deserialize the buffer and store it in the NET_JOIN_PDU
-        struct NET_JOIN_PDU net_join = {0};
-        memcpy(&net_join.type, buffer, sizeof(net_join.type));
-        memcpy(&net_join.src_address, buffer + sizeof(net_join.type), sizeof(net_join.src_address));
-        memcpy(&net_join.src_port, buffer + sizeof(net_join.type) + sizeof(net_join.src_address), sizeof(net_join.src_port));
-        memcpy(&net_join.max_span, buffer + sizeof(net_join.type) + sizeof(net_join.src_address) + sizeof(net_join.src_port), sizeof(net_join.max_span));
-        memcpy(&net_join.max_address, buffer + sizeof(net_join.type) + sizeof(net_join.src_address) + sizeof(net_join.src_port) + sizeof(net_join.max_span), sizeof(net_join.max_address));
-        memcpy(&net_join.max_port, buffer + sizeof(net_join.type) + sizeof(net_join.src_address) + sizeof(net_join.src_port) + sizeof(net_join.max_span) + sizeof(net_join.max_address), sizeof(net_join.max_port));
-
-        printf("New Node IP: %s\n", inet_ntoa(sender_addr.sin_addr));
-        printf("New Node Port: %d\n", ntohs(sender_addr.sin_port));
-
-
-
-        if (rcv_data == -1){
-            perror("recv faulure as the address is not known lol");
+        int poll_status = poll(&poll_fd, 1, 500);
+        
+        if (poll_status == -1){
+            perror("poll failure");
             return 1;
+        }else if (poll_status == 0){
+            continue;
         }
 
+        if (poll_fd.revents & POLLIN) {
+            char buffer[1024];
+            memset(buffer, 0, sizeof(buffer));
+            struct sockaddr_in sender_addr;
+            socklen_t sender_addr_len = sizeof(sender_addr);
+            struct NET_JOIN_PDU net_join = {0};
 
-        printf("Alive message sent to the tracker \n");
+            int rcv_data = recvfrom(node->sockfd_a, &net_join, sizeof(net_join), 0, (struct sockaddr *)&sender_addr, &sender_addr_len);
+            if (rcv_data == -1) {
+                perror("recvfrom failed");
+                continue;
+            }
+            net_join.src_address = ntohl(net_join.src_address);
+            net_join.src_port = ntohs(net_join.src_port);
+            net_join.max_address = ntohl(net_join.max_address);
+            net_join.max_port = ntohs(net_join.max_port);
+
+            // the node that recived the informtion from the node, may not know the port address of itself.
+            // so it will store the port address of the node in the node.
+            printf("before assigning the port: %d\n", node->port);  
+            node->port = net_join.max_port;
+            printf("after assigning the port: %d\n", node->port);
+
+            printf("Data received from IP: %s, Port: %d\n",
+                   inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+            printf("Received %d bytes of data: %s\n", rcv_data, buffer);
+            printf("the size of the struct NET_JOIN_PDU: %ld\n", sizeof(net_join));
+            printf("Type: %d\n", net_join.type);
+            printf("Source Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join.src_address}));
+            printf("Source Port: %d\n", net_join.src_port);
+            printf("Max Span: %d\n", net_join.max_span);
+            printf("Max Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join.max_address}));
+            printf("Max Port: %d\n", net_join.max_port);
+
+            
+
+
+            // it is time to deserialize the buffer and store it in the net_join
+           
+            //deserialise_buffer(buffer, &net_join);
+
+        
+        }
+
+        if (poll_fd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
+            printf("Socket error or hang-up\n");
+            break;
+        }
 
     }
 
-
 }
+
+
+
+
 
 
 // that state will NET_JOIN to the node that we got from the tracker.
 // what I think i will start traversing the networ from the node that we got from the tracker.
 // we will make the node the predecessor the founded node of the node.
-int q7_state(void* n, void* data){
+int q7_state(void* n, void* data) {
     printf("q7 state\n");
-    Node* node = (Node*)n;
-	struct NET_GET_NODE_RESPONSE_PDU net_get_node_response;
-	
-	//Skaffa successor infon
 
-	// Create socket for communicating with the active node via TCP
-	node->sockfd_b = socket();
-    if (node->sockfd_b == -1) {
-        perror("socket failure");
-        return 1;
-    }
-
-	int connect_status = connect(node->sockfd_b);
-    if (connect_status == -1) {
-        perror("connect failure");
-        return 1;
-    }
-
-	//NET_JOIN
-
-
-
-    // we get respons from the tracker in the get_node_response it contains the address, which is in the network.
-    // but the question is how the node in network recieves the messge from the new node via udp
-    // it does not know about the new nodes address and port before recieving the message.
     struct NET_GET_NODE_RESPONSE_PDU* net_get_node_response = (struct NET_GET_NODE_RESPONSE_PDU*)data;
     Node* node = (Node*)n;
-
+    
+    printf("max port %d\n", ntohs(net_get_node_response->port));
+    // Construct the NET_JOIN_PDU
     struct NET_JOIN_PDU net_join = {0};
-    net_join.type = NET_JOIN;
-    net_join.src_address = node->public_ip.s_addr;
-    net_join.src_port = node->port;
-    net_join.max_span = 0;
-    net_join.max_address = 0;
-    net_join.max_port = 0;
+    net_join.type = NET_JOIN; 
+    net_join.src_address = htonl(node->public_ip.s_addr);  
+    net_join.src_port = htons(node->port);
+    net_join.max_span = 0;                         
+    net_join.max_address = htonl(net_get_node_response->address); 
+    net_join.max_port = net_get_node_response->port;
 
-    // now we will send the NET_JOIN to the the node that we got from the tracker.
+    // Print details for debugging
+    printf("Node in Q7: %s\n", inet_ntoa((struct in_addr){.s_addr = net_get_node_response->address}));
+    printf("Node Port___Q7: %d\n", ntohs(net_get_node_response->port));
+
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = net_get_node_response->address; 
     addr.sin_port = net_get_node_response->port;
-    int send_status = sendto(node->sockfd_a, &net_join, sizeof(net_join), 0, 
-                            (struct sockaddr*)&addr, sizeof(addr));
 
+    ssize_t bytes_sent = sendto(node->sockfd_a, &net_join, sizeof(net_join), 0, (struct sockaddr *)&addr, sizeof(addr));
+    if (bytes_sent == -1) {
+        perror("sendto failed");
+        return 1;
+    }
 
-    // now new will wait for the response from its predecessor.
-    struct NET_JOIN_RESPONSE_PDU net_join_response = {0};
-    char buffer[1024];
-    memset(buffer, 0, sizeof(buffer));
-
-    /// precdecessor will send the response to the new node, but it creates a new socket, it establishes a new TCP connection.
-
-
-    
-
-
+    return 0;
 }
 
 
@@ -415,4 +437,6 @@ int q5_state(void* n, void* data){
     return 0;
 
 } 
+
+
 
