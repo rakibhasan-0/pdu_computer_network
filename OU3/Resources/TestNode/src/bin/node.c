@@ -483,7 +483,7 @@ int q7_state(void* n, void* data) {
     printf("Sent NET_JOIN from state_7\n");
     // we will listen to the NET_JOIN_RESPONSE from the node
     struct NET_JOIN_RESPONSE_PDU net_join_response = {0};
-    struct sockaddr_in sender_addr;
+ 
     
     node->sockfd_c = socket(AF_INET, SOCK_STREAM, 0);
     if (node->sockfd_b == -1) {
@@ -493,7 +493,7 @@ int q7_state(void* n, void* data) {
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = node->public_ip.s_addr;
-    addr.sin_port = htons(node->port);
+    addr.sin_port = node->port;
 
     int bind_status = bind(node->sockfd_c, (struct sockaddr *)&addr, sizeof(addr));
     if (bind_status == -1) {
@@ -506,6 +506,9 @@ int q7_state(void* n, void* data) {
         return 1;
     }
 
+    // we are using it to get the senders port and address as net_join_response.
+    // does not contain the information about the sender aka the predecessor.
+    struct sockaddr_in sender_addr; 
     socklen_t sender_addr_len = sizeof(sender_addr); 
     int accept_status = accept(node->sockfd_c, (struct sockaddr*)&sender_addr, &sender_addr_len);
     if (accept_status == -1) {
@@ -523,13 +526,17 @@ int q7_state(void* n, void* data) {
     printf("Range End: %d\n", net_join_response.range_end);
 
     // accept predecessor means the src address of the net_join_response is the predecessor of the node.
-    node->predecessor_ip_address.s_addr = sender_addr.sin_addr.s_addr;
-    node->predecessor_port = sender_addr.sin_port;
+    node->predecessor_ip_address.s_addr = ntohl(net_join_response.next_address);
+    node->predecessor_port = ntohs(net_join_response.next_port); // we need to think about the port number of the predecessor...
+    node->successor_ip_address.s_addr = ntohl(net_get_node_response->address);
+    node->successor_port = ntohs(net_get_node_response->port);
     node->hash_range_start = net_join_response.range_start;
     node->hash_range_end = net_join_response.range_end;
     node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
-    printf("Predecessor IP: %s\n", inet_ntoa(node->predecessor_ip_address));
+    printf("Predecessor IP: %s\n", inet_ntoa(node->predecessor_ip_address)); // it is not the original port..butit seems there is another port.
     printf("Predecessor Port: %d\n", node->predecessor_port);
+    printf("Successor IP: %s\n", inet_ntoa(node->successor_ip_address));
+    printf("Successor Port: %d\n", node->successor_port);
     printf("we are about to move q8 state from q7\n");
     
 
@@ -638,7 +645,7 @@ int q5_state(void* n, void* data) {
     struct sockaddr_in addr = {0};
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = net_join->src_address;
-    addr.sin_port = htons(net_join->src_port);  
+    addr.sin_port = net_join->src_port;  
 
     // Connect to the sender
     int connect_status = connect(node->sockfd_c, (struct sockaddr*)&addr, sizeof(addr));
@@ -658,10 +665,10 @@ int q5_state(void* n, void* data) {
     }
 
     // we may close the connect of the socket_c here.
-    close(node->sockfd_c);
     // Return to q6 state
     node->state_handler = state_handlers[5];
     node->state_handler(node, NULL);
+    close(node->sockfd_c);
 
 
     return 0;
