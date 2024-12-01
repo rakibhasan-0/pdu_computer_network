@@ -22,6 +22,9 @@
 
 #define STUN_LOOKUP 200
 #define STUN_RESPONSE 201
+#define GET_SUCCESSOR 50
+#define GET_SUCCESSOR_RESPONSE 51
+
 
 #ifndef PDU_DEF
 #define PDU_DEF
@@ -114,6 +117,17 @@ struct STUN_LOOKUP_PDU {
 struct STUN_RESPONSE_PDU {
     uint8_t type;
     uint32_t address;
+};
+
+
+struct GET_SUCCESSOR_PDU {
+    uint8_t type;
+};
+
+struct GET_SUCCESSOR_RESPONSE_PDU {
+    uint8_t type;
+    uint32_t successor_address;
+    uint16_t successor_port;
 };
 
 #endif
