@@ -70,11 +70,11 @@ struct Node{
     // Socket ID for B, is used to communicate(sending/reciving) with the successor.
     unsigned int sockfd_b; // TCP connection to successor
     // Socket ID for C,is used to communicate(sending/reciving) with new conections.
-    unsigned int sockfd_c; //TCP listening socket for new connections
+    unsigned int lyssener_socket; //TCP listening socket for new connections
     // Socket ID for D is used to communicate(sending/reciving) with the predecessor.
     unsigned int sockfd_d; // TCP connection to predecessor
 
-    // state handler aka function pointer
+    // state handler aka function pointer 
     int (*state_handler)(void*, void*);
 
 };
@@ -329,10 +329,10 @@ int q6_state(void* n, void* data){
    
     node->is_alive = true;
 
-    if(node->sockfd_c == 0){
+    if(node->lyssener_socket == 0){
 
-        node->sockfd_c = socket(AF_INET, SOCK_STREAM, 0);
-        if (node->sockfd_c == -1) {
+        node->lyssener_socket = socket(AF_INET, SOCK_STREAM, 0);
+        if (node->lyssener_socket == -1) {
             perror("socket failure");
             return 1;
         }
@@ -344,14 +344,14 @@ int q6_state(void* n, void* data){
         addr_sock_c.sin_port = node->port;
 
 
-        int bind_status = bind(node->sockfd_c, (struct sockaddr*)&addr_sock_c, sizeof(addr_sock_c));
+        int bind_status = bind(node->lyssener_socket, (struct sockaddr*)&addr_sock_c, sizeof(addr_sock_c));
         if (bind_status == -1) {
             printf("bind failure __happened here\n");
             perror("bind failure");
             return 1;
         }
 
-        int listen_status = listen(node->sockfd_c, 1);
+        int listen_status = listen(node->lyssener_socket, 1);
         if (listen_status == -1) {
             perror("listen failure");
             return 1;
@@ -364,7 +364,7 @@ int q6_state(void* n, void* data){
     struct pollfd poll_fd [2];
     poll_fd[0].fd = node->sockfd_a;
     poll_fd[0].events = POLLIN;
-    poll_fd[1].fd = node->sockfd_c;
+    poll_fd[1].fd = node->lyssener_socket;
     poll_fd[1].events = POLLIN;
 
 
@@ -415,24 +415,35 @@ int q6_state(void* n, void* data){
                     node->state_handler(node, &net_join);
                     return 0;
 
-                }else if(poll_fd[i].fd == node->sockfd_c){
+                }else if(poll_fd[i].fd == node->lyssener_socket){
                     struct sockaddr_in sender_addr;
                     socklen_t sender_addr_len = sizeof(sender_addr);
 
-                    int accept_status = accept(node->sockfd_c, (struct sockaddr*)&sender_addr, &sender_addr_len);
+                    int accept_status = accept(node->lyssener_socket, (struct sockaddr*)&sender_addr, &sender_addr_len);
+                    char buffer[1024];
+                    int recv_status = recv(accept_status, buffer , sizeof(buffer), 0);
+                    if (recv_status == -1){
+                        perror("recv failed");
+                        return 1;
+                    }
 
-                    struct NET_JOIN_RESPONSE_PDU net_join_response = {0};
-                    int recv_status = recv(accept_status, &net_join_response , sizeof(net_join_response), 0);
+                    if(buffer[0] == GET_SUCCESSOR){
+                        printf("Received GET_SUCCESSOR request from predecessor.\n");
+                        struct GET_SUCCESSOR_RESPONSE_PDU get_successor_response = {0};
+                        get_successor_response.type = GET_SUCCESSOR_RESPONSE;
+                        get_successor_response.successor_address = node->successor_ip_address.s_addr;
+                        get_successor_response.successor_port = htons(node->successor_port);
 
-                    printf("Received NET_JOIN_RESPONSE\n");
-                    printf("the number of bytes received: %d\n", recv_status);
-                    printf("Next Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join_response.next_address}));
-                    printf("Next Port: %d\n", ntohs(net_join_response.next_port));
-                    printf("Range Start: %d\n", net_join_response.range_start);
-                    printf("Range End: %d\n", net_join_response.range_end);
-                    printf("we shall not exit the q6 state\n");
+                        int send_status = send(accept_status, &get_successor_response, sizeof(get_successor_response), 0);
+                        if (send_status == -1) {
+                            perror("send to predecessor failed");
+                            return 1;
+                        }
+
+                        printf("Sent GET_SUCCESSOR_RESPONSE to predecessor.\n");
+                    }
                     close(accept_status);
-
+                    //close(node->lyssener_socket);
                 
                 }
             
@@ -487,7 +498,7 @@ int q7_state(void* n, void* data) {
     struct NET_JOIN_RESPONSE_PDU net_join_response = {0};
  
     
-    node->sockfd_c = socket(AF_INET, SOCK_STREAM, 0);
+    node->lyssener_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (node->sockfd_b == -1) {
         perror("socket failed");
         return 1;
@@ -497,12 +508,12 @@ int q7_state(void* n, void* data) {
     addr.sin_addr.s_addr = node->public_ip.s_addr;
     addr.sin_port = node->port;
 
-    int bind_status = bind(node->sockfd_c, (struct sockaddr *)&addr, sizeof(addr));
+    int bind_status = bind(node->lyssener_socket, (struct sockaddr *)&addr, sizeof(addr));
     if (bind_status == -1) {
         perror("bind failed");
         return 1;
     }
-    int listen_status = listen(node->sockfd_c, 1);
+    int listen_status = listen(node->lyssener_socket, 1);
     if (listen_status == -1) {
         perror("listen failed");
         return 1;
@@ -512,7 +523,7 @@ int q7_state(void* n, void* data) {
     // does not contain the information about the sender aka the predecessor.
     struct sockaddr_in sender_addr; 
     socklen_t sender_addr_len = sizeof(sender_addr); 
-    int accept_status = accept(node->sockfd_c, (struct sockaddr*)&sender_addr, &sender_addr_len);
+    int accept_status = accept(node->lyssener_socket, (struct sockaddr*)&sender_addr, &sender_addr_len);
     if (accept_status == -1) {
         perror("accept failed");
         return 1;
@@ -541,8 +552,8 @@ int q7_state(void* n, void* data) {
     printf("Successor Port: %d\n", node->successor_port);
     printf("we are about to move q8 state from q7\n");
     
-    //close(node->sockfd_c);
-    //node->sockfd_c = 0;
+    //close(node->lyssener_socket);
+    //node->lyssener_socket = 0;
 
     // we will move to the q8 state and connect to the successor.
     node->state_handler = state_handlers[8];
