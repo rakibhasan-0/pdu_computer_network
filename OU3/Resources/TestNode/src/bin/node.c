@@ -343,6 +343,7 @@ int q6_state(void* n, void* data){
         addr_sock_c.sin_addr.s_addr = node->public_ip.s_addr;
         addr_sock_c.sin_port = node->port;
 
+
         int bind_status = bind(node->sockfd_c, (struct sockaddr*)&addr_sock_c, sizeof(addr_sock_c));
         if (bind_status == -1) {
             printf("bind failure __happened here\n");
@@ -388,7 +389,8 @@ int q6_state(void* n, void* data){
         for(int i = 0; i < 2; i++){
 
             if(poll_fd[i].revents == POLLIN){
-               
+
+                printf("reveived something\n");
                 if(poll_fd[i].fd == node->sockfd_a){
                     printf("we are about to recieve the NET_JOIN from another noder\n");
 
@@ -430,7 +432,7 @@ int q6_state(void* n, void* data){
                     printf("Range End: %d\n", net_join_response.range_end);
                     printf("we shall not exit the q6 state\n");
                     close(accept_status);
-                    close(node->sockfd_c);
+
                 
                 }
             
@@ -539,8 +541,8 @@ int q7_state(void* n, void* data) {
     printf("Successor Port: %d\n", node->successor_port);
     printf("we are about to move q8 state from q7\n");
     
-    close(node->sockfd_c);
-    node->sockfd_c = 0;
+    //close(node->sockfd_c);
+    //node->sockfd_c = 0;
 
     // we will move to the q8 state and connect to the successor.
     node->state_handler = state_handlers[8];
@@ -642,6 +644,7 @@ int q5_state(void* n, void* data) {
         return 1;
     }
 
+
     printf("we are about the send the NET_JOIN_RESPONSE to state 7\n");
     printf("sender address: %s\n", inet_ntoa(addr.sin_addr));
     printf("sender port: %d\n", ntohs(addr.sin_port));
@@ -704,12 +707,19 @@ int q8_state(void* n, void* data) {
 
     struct sockaddr_in addr_predecessor = {0};
     addr_predecessor.sin_family = AF_INET;
-    addr_predecessor.sin_addr.s_addr = htonl(node->predecessor_ip_address.s_addr);
-    addr_predecessor.sin_port = htons(node->predecessor_port);
+    addr_predecessor.sin_addr.s_addr = node->predecessor_ip_address.s_addr;
+    addr_predecessor.sin_port = node->predecessor_port;
 
     node->sockfd_d = socket(AF_INET, SOCK_STREAM, 0);
-
+    // try with the UDP
+    if (node->sockfd_d == -1) {
+        perror("socket failure");
+        return -1;
+    }
+    
     int connect_status = connect(node->sockfd_d, (struct sockaddr*)&addr_predecessor, sizeof(addr_predecessor));
+
+
 
     // Send GET_SUCCESSOR_PDU to the predecessor
     ssize_t bytes_sent = send(node->sockfd_d, &get_successor, sizeof(get_successor), 0);
