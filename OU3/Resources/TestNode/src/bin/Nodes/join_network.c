@@ -65,32 +65,13 @@ int q7_state(void* n, void* data) {
     struct NET_JOIN_RESPONSE_PDU net_join_response = {0};
  
     
-    node->listener_socket = socket(AF_INET, SOCK_STREAM, 0);
-    if (node->sockfd_b == -1) {
-        perror("socket failed");
-        return 1;
-    }
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = node->public_ip.s_addr;
-    addr.sin_port = node->port;
-
-    int bind_status = bind(node->listener_socket, (struct sockaddr *)&addr, sizeof(addr));
-    if (bind_status == -1) {
-        perror("bind failed");
-        return 1;
-    }
-    int listen_status = listen(node->listener_socket, 1);
-    if (listen_status == -1) {
-        perror("listen failed");
-        return 1;
-    }
-
     // we are using it to get the senders port and address as net_join_response.
     // does not contain the information about the sender aka the predecessor.
     struct sockaddr_in sender_addr; 
+    printf("the listner port is %d\n", node->port);
     socklen_t sender_addr_len = sizeof(sender_addr); 
     int accept_status = accept(node->listener_socket, (struct sockaddr*)&sender_addr, &sender_addr_len);
+    printf("the new socket for the predecessor is _________ %d\n", accept_status);
     if (accept_status == -1) {
         perror("accept failed");
         return 1;
@@ -98,6 +79,10 @@ int q7_state(void* n, void* data) {
 
     printf("we are about to recieve the NET_JOIN_RESPONSE from the state 5\n");
     int recv_status = recv(accept_status, &net_join_response, sizeof(net_join_response), 0);
+    if(recv_status == -1){
+        perror("recv failed");
+        return 1;
+    }
     printf("Received NET_JOIN_RESPONSE\n");
     printf("The number of bytes received: %d\n", recv_status);
     printf("Next Address: %s\n", inet_ntoa((struct in_addr){.s_addr = ntohl(net_join_response.next_address)}));
@@ -108,9 +93,10 @@ int q7_state(void* n, void* data) {
     // accept predecessor means the src address of the net_join_response is the predecessor of the node.
     node->predecessor_ip_address.s_addr = ntohl(net_join_response.next_address);
     node->predecessor_port = ntohs(net_join_response.next_port); // we need to think about the port number of the predecessor...
-    node->successor_ip_address.s_addr = ntohl(net_get_node_response->address);
+    node->successor_ip_address.s_addr = net_get_node_response->address;
     node->successor_port = ntohs(net_get_node_response->port);
     node->hash_range_start = net_join_response.range_start;
+    node->sockfd_d = accept_status;
     node->hash_range_end = net_join_response.range_end;
     node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
     printf("Predecessor IP: %s\n", inet_ntoa(node->predecessor_ip_address)); // it is not the original port..butit seems there is another port.
@@ -123,6 +109,7 @@ int q7_state(void* n, void* data) {
     //node->listener_socket = 0;
 
     // we will move to the q8 state and connect to the successor.
+    // the question is what does mean by that, I mean how can I connect with that 
     node->state_handler = state_handlers[8];
     node->state_handler(node, &net_join_response);
 
@@ -142,23 +129,7 @@ int q8_state(void* n, void* data) {
     printf("Sending GET_SUCCESSOR request to predecessor.\n");
     printf("Predecessor IP: %s\n", inet_ntoa(node->predecessor_ip_address));
     printf("Predecessor Port: %d\n", node->predecessor_port);
-
-    struct sockaddr_in addr_predecessor = {0};
-    addr_predecessor.sin_family = AF_INET;
-    addr_predecessor.sin_addr.s_addr = node->predecessor_ip_address.s_addr;
-    addr_predecessor.sin_port = node->predecessor_port;
-
-    node->sockfd_d = socket(AF_INET, SOCK_STREAM, 0);
-    // try with the UDP
-    if (node->sockfd_d == -1) {
-        perror("socket failure");
-        return -1;
-    }
-    
-    int connect_status = connect(node->sockfd_d, (struct sockaddr*)&addr_predecessor, sizeof(addr_predecessor));
-
-
-
+   
     // Send GET_SUCCESSOR_PDU to the predecessor
     ssize_t bytes_sent = send(node->sockfd_d, &get_successor, sizeof(get_successor), 0);
     if (bytes_sent == -1) {
@@ -168,6 +139,7 @@ int q8_state(void* n, void* data) {
         return -1;
     }
 
+    printf("RHe is the predecessor socket,%d\n", node->sockfd_d);
     printf("GET_SUCCESSOR request sent to predecessor.\n");
 
     // Prepare to receive GET_SUCCESSOR_RESPONSE_PDU

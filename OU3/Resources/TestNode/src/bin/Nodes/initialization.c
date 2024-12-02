@@ -17,6 +17,45 @@ int q1_state(void* n, void* data) {
         return 1;
     }
 
+    // we are craeting a socket for the listener
+    node->listener_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (node->listener_socket == -1) {
+        perror("socket failure");
+        return 1;
+    }
+
+
+    struct sockaddr_in addr_sock_c;
+    memset(&addr_sock_c, 0, sizeof(addr_sock_c));
+    addr_sock_c.sin_family = AF_INET;
+    addr_sock_c.sin_addr.s_addr = node->public_ip.s_addr;
+
+
+    int bind_status = bind(node->listener_socket, (struct sockaddr*)&addr_sock_c, sizeof(addr_sock_c));
+    if (bind_status == -1) {
+        printf("bind failure __happened here\n");
+        perror("bind failure");
+        return 1;
+    }
+
+    int listen_status = listen(node->listener_socket, 1);
+    if (listen_status == -1) {
+        perror("listen failure");
+        return 1;
+    }
+
+     // get the port number of the listener socket
+    struct sockaddr_in addr_listener;
+    socklen_t addr_len_listener = sizeof(addr_listener);
+    if (getsockname(node->listener_socket, (struct sockaddr*)&addr_listener, &addr_len_listener) == -1) {
+        perror("getsockname failed");
+        return 1;
+    }
+
+    node->port = ntohs(addr_listener.sin_port);
+    printf("Listener Port: %d\n", node->port);
+
+   
     int send_status = sendto(node->sockfd_a, &stun_lookup, sizeof(stun_lookup), 0, node->tracker_addr->ai_addr,
                              node->tracker_addr->ai_addrlen);
     if (send_status == -1) {
@@ -31,8 +70,6 @@ int q1_state(void* n, void* data) {
         perror("getsockname failed");
         return 1;
     }
-
-    node->port = ntohs(addr.sin_port);
 
     // we are now moving to the next state q2
     node->state_handler = state_handlers[1];
@@ -92,7 +129,6 @@ int q3_state(void* n, void* data){
     struct NET_GET_NODE_PDU net_get_node = {0};
     // just for check if the public ip is stored in the node
     //printf("Public IP from state 3: %s\n", inet_ntoa(node->public_ip));
-
 
     net_get_node.type = NET_GET_NODE;
 

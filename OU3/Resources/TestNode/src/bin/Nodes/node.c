@@ -2,15 +2,15 @@
 
 
 state_handler state_handlers[] = {
-    q1_state,   // State 0
-    q2_state,   // State 1
-    q3_state,   // State 2
-    q4_state,   // State 3
-    q5_state,   // State 4
-    q6_state,   // State 5
-    q7_state,   // State 6
-    q12_state,  // State 7
-    q8_state    // State 8
+    q1_state,
+    q2_state,
+    q3_state,
+    q4_state, 
+    q5_state,  
+    q6_state,   
+    q7_state,  
+    q12_state, 
+    q8_state   
 };
 
 /*
@@ -52,6 +52,7 @@ int main(int argc, char* argv[]) {
     node->tracker_addr = res;
     node->state_handler = state_handlers[0]; // we are initializing the function pointer to point to the q1 state.
     node->state_handler(node, NULL); // now we are incoking the function by using the function pointer.
+
 
 
     freeaddrinfo(node->tracker_addr);

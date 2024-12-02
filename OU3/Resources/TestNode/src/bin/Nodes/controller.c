@@ -9,44 +9,19 @@ int q6_state(void* n, void* data){
     net_alive.type = NET_ALIVE;
    
     node->is_alive = true;
-
-    if(node->listener_socket == 0){
-
-        node->listener_socket = socket(AF_INET, SOCK_STREAM, 0);
-        if (node->listener_socket == -1) {
-            perror("socket failure");
-            return 1;
-        }
-
-        struct sockaddr_in addr_sock_c;
-        memset(&addr_sock_c, 0, sizeof(addr_sock_c));
-        addr_sock_c.sin_family = AF_INET;
-        addr_sock_c.sin_addr.s_addr = node->public_ip.s_addr;
-        addr_sock_c.sin_port = node->port;
-
-
-        int bind_status = bind(node->listener_socket, (struct sockaddr*)&addr_sock_c, sizeof(addr_sock_c));
-        if (bind_status == -1) {
-            printf("bind failure __happened here\n");
-            perror("bind failure");
-            return 1;
-        }
-
-        int listen_status = listen(node->listener_socket, 1);
-        if (listen_status == -1) {
-            perror("listen failure");
-            return 1;
-        }
-    }
     
     // time interval for the alive message
     int timeout = 1;
     time_t last_time = time(NULL);
-    struct pollfd poll_fd [2];
+    struct pollfd poll_fd[4];
     poll_fd[0].fd = node->sockfd_a;
     poll_fd[0].events = POLLIN;
     poll_fd[1].fd = node->listener_socket;
     poll_fd[1].events = POLLIN;
+    poll_fd[2].fd = node->sockfd_b;
+    poll_fd[2].events = POLLIN;
+    poll_fd[3].fd = node->sockfd_d;
+    poll_fd[3].events = POLLIN;
 
 
     while(1){
@@ -59,7 +34,7 @@ int q6_state(void* n, void* data){
             timeout = 6;
         }
 
-        int poll_status = poll(poll_fd, 2, 500); 
+        int poll_status = poll(poll_fd, 4, 500); 
         if (poll_status == -1){
             perror("poll failure");
             return 1;
@@ -67,14 +42,12 @@ int q6_state(void* n, void* data){
             continue;
         }
 
-        for(int i = 0; i < 2; i++){
+        for(int i = 0; i < 4; i++){
 
             if(poll_fd[i].revents == POLLIN){
 
-                printf("reveived something\n");
                 if(poll_fd[i].fd == node->sockfd_a){
-                    printf("we are about to recieve the NET_JOIN from another noder\n");
-
+                  
                     struct sockaddr_in sender_addr;
                     socklen_t sender_addr_len = sizeof(sender_addr);
                     struct NET_JOIN_PDU net_join = {0};
@@ -123,11 +96,19 @@ int q6_state(void* n, void* data){
 
                         printf("Sent GET_SUCCESSOR_RESPONSE to predecessor.\n");
                     }
-                    close(accept_status);
+                    //close(accept_status);
                     //close(node->listener_socket);
+            
                 
                 }
-            
+                else if(poll_fd[i].fd == node->sockfd_b){
+                    printf("we are about to recieve the NET_JOIN_RESPONSE from the state 5\n");
+                }
+
+                else if(poll_fd[i].fd == node->sockfd_d){
+                   printf("we are about to recieve the GET_SUCCESSOR_RESPONSE from the state 8\n");
+                }
+                    
             }
         }
     }
