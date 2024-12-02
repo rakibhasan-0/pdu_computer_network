@@ -102,11 +102,11 @@ int q6_state(void* n, void* data){
                 
                 }
                 else if(poll_fd[i].fd == node->sockfd_b){
-                    printf("we are about to recieve the NET_JOIN_RESPONSE from the state 5\n");
+                   // printf("we are about to recieve the NET_JOIN_RESPONSE from the state 5\n");
                 }
 
                 else if(poll_fd[i].fd == node->sockfd_d){
-                   printf("we are about to recieve the GET_SUCCESSOR_RESPONSE from the state 8\n");
+                   //printf("we are about to recieve the GET_SUCCESSOR_RESPONSE from the state 8\n");
                 }
                     
             }
