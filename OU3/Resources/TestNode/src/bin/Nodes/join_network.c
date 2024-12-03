@@ -5,7 +5,7 @@
 int q4_state(void* n, void* data){
 
     Node* node = (Node*)n;
-    printf("q4 state\n");
+    printf("[q4 state]\n");
     // the node itself will be its predecessor and successor
     // the initialization of the 
     node->predecessor_ip_address.s_addr = INADDR_NONE;
@@ -31,7 +31,8 @@ int q4_state(void* n, void* data){
 // what I think i will start traversing the networ from the node that we got from the tracker.
 // we will make the node the predecessor the founded node of the node.
 int q7_state(void* n, void* data) {
-    printf("q7 state\n");
+    printf("[q7 state]\n");
+    printf("I am not the first node, sending NET_JOIN message...\n");
 
     struct NET_GET_NODE_RESPONSE_PDU* net_get_node_response = (struct NET_GET_NODE_RESPONSE_PDU*)data;
     Node* node = (Node*)n;
@@ -52,7 +53,7 @@ int q7_state(void* n, void* data) {
     addr.sin_addr.s_addr = net_get_node_response->address; 
     addr.sin_port = net_get_node_response->port;
 
-    printf("we are about to send the net_join to the state 6\n");
+    //printf("we are about to send the net_join to the state 6\n");
     // the node will send the NET_JOIN to the node, one of the active node may accept the message 
     ssize_t bytes_sent = sendto(node->sockfd_a, &net_join, sizeof(net_join), 0, (struct sockaddr *)&addr, sizeof(addr));
     if (bytes_sent == -1) {
@@ -60,19 +61,19 @@ int q7_state(void* n, void* data) {
         return 1;
     }
 
-    printf("Sent NET_JOIN from state_7\n");
+    //printf("Sent NET_JOIN from state_7\n");
     // we will listen to the NET_JOIN_RESPONSE from the node aka node which is the max node.
     struct NET_JOIN_RESPONSE_PDU net_join_response = {0};   
     // we are using it to get the senders port and address as net_join_response.
     // does not contain the information about the sender aka the predecessor.
     struct sockaddr_in sender_addr; 
-    printf("the listner port is %d\n", node->port);
+    //printf("the listner port is %d\n", node->port);
 
     // in the state machine diagram, it mentioned that we will accept the predcessor.
     // I guess this type of accepting in that case. 
     socklen_t sender_addr_len = sizeof(sender_addr); 
     int accept_status = accept(node->listener_socket, (struct sockaddr*)&sender_addr, &sender_addr_len);
-    printf("the new socket for the predecessor is _________ %d\n", accept_status);
+    //printf("the new socket for the predecessor is _________ %d\n", accept_status);
     if (accept_status == -1) {
         perror("accept failed");
         return 1;
@@ -83,10 +84,9 @@ int q7_state(void* n, void* data) {
     node->predecessor_port = ntohs(sender_addr.sin_port);
     node->sockfd_d = accept_status;
 
-    printf("Accepted predecessor in state 7: %s:%d\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+    printf("Accepted new predecessor: %s:%d\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
 
     // now we are receiving the NET_JOIN_RESPONSE from the node or the node that has max hash range.
-    printf("we are about to recieve the NET_JOIN_RESPONSE from the state 5\n");
     int recv_status = recv(accept_status, &net_join_response, sizeof(net_join_response), 0);
     if(recv_status == -1){
         perror("recv failed");
@@ -110,7 +110,7 @@ int q7_state(void* n, void* data) {
 
 int q8_state(void* n, void* data) {
 
-    printf("q8 state\n");
+    printf("[q8 state]\n");
 
     Node* node = (Node*)n;
     struct NET_JOIN_RESPONSE_PDU net_join_response = *(struct NET_JOIN_RESPONSE_PDU*)data;
@@ -121,8 +121,9 @@ int q8_state(void* n, void* data) {
     addr.sin_addr.s_addr = ntohl(net_join_response.next_address);
     addr.sin_port = net_join_response.next_port;
 
-    printf("Successor IP: %s\n", inet_ntoa(addr.sin_addr));
-    printf("Successor Port: %d\n", ntohs(addr.sin_port));
+
+    printf("Connecting to successor %s:%d", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+    printf(" ...\n");
 
     // Connect to the successor
     node->sockfd_b = socket(AF_INET, SOCK_STREAM, 0);

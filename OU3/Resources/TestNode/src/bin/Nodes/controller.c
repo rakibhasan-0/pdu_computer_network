@@ -4,7 +4,7 @@
 int q6_state(void* n, void* data){
 
     Node* node = (Node*)n;
-    printf("q6 state\n");
+    printf("[q6 state]\n");
     struct NET_ALIVE_PDU net_alive = {0};
     net_alive.type = NET_ALIVE;
    
@@ -31,7 +31,7 @@ int q6_state(void* n, void* data){
             int send_status = sendto(node->sockfd_a, &net_alive, sizeof(net_alive), 0,
                                      node->tracker_addr->ai_addr, node->tracker_addr->ai_addrlen);
             last_time = current_time;
-            timeout = 6;
+            timeout = 7;
         }
 
         int poll_status = poll(poll_fd, 4, 500); 
@@ -58,13 +58,13 @@ int q6_state(void* n, void* data){
                         continue;
                     }
 
-                    printf("Received NET_JOIN (Q6)\n");
-                    printf("Type (Q6): %d\n", net_join.type);
-                    printf("Source Address(Q6): %s\n", inet_ntoa((struct in_addr){.s_addr = net_join.src_address}));
-                    printf("Source Port(Q6): %d\n", net_join.src_port);
-                    printf("Max address(Q6): %s\n", inet_ntoa((struct in_addr){.s_addr = net_join.max_address}));
-                    printf("Max Port(Q6): %d\n", net_join.max_port);
-                    printf("we are abour to move to the q12 state from q6\n");
+                    //printf("Received NET_JOIN (Q6)\n");
+                    //printf("Type (Q6): %d\n", net_join.type);
+                    //printf("Source Address(Q6): %s\n", inet_ntoa((struct in_addr){.s_addr = net_join.src_address}));
+                    //printf("Source Port(Q6): %d\n", net_join.src_port);
+                    //printf("Max address(Q6): %s\n", inet_ntoa((struct in_addr){.s_addr = net_join.max_address}));
+                    //printf("Max Port(Q6): %d\n", net_join.max_port);
+                    //printf("we are abour to move to the q12 state from q6\n");
                     node->state_handler = state_handlers[7];
                     node->state_handler(node, &net_join);
                     return 0;

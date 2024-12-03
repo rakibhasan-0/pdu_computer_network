@@ -12,34 +12,18 @@
 int q12_state(void* n, void* data) {
     Node* node = (Node*)n;
     struct NET_JOIN_PDU* net_join = (struct NET_JOIN_PDU*)data;
-    printf("q12 state\n");
+    printf("[q12 state]\n");
 
-    // we are checking the message we got from the state 6
-    printf("Type__rcv from 6: %d\n", net_join->type);
-    printf("Source Address__rcv from 6: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->src_address}));
-    printf("Source Port:__rcv from 6 %d\n", net_join->src_port);
-    printf("Max Span:___rcv from 6 %d\n", net_join->max_span);
-    printf("Max Address:___rcv from 6 %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->max_address}));
-    printf("Max Port:___ rcv from 6 %d\n", net_join->max_port);
-    // updating the max fields of the net_join message.
 
     net_join->max_address = node->public_ip.s_addr;
     net_join->max_port = node->port;
     net_join->max_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
 
-    // checking the updated net_join message
-    printf("Type__after__updated: %d\n", net_join->type);
-    printf("Source Address__after__updated: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->src_address}));
-    printf("Source Port:__after__updated %d\n", net_join->src_port);
-    printf("Max Span:___after__updated %d\n", net_join->max_span);
-    printf("Max Address:___after__updated %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->max_address}));
-    printf("Max Port:___after__updated %d\n", net_join->max_port);
-
-
 
     // Check if the node has no successor or predecessor
     if (node->predecessor_ip_address.s_addr == INADDR_NONE && node->successor_ip_address.s_addr == INADDR_NONE) {
         // Move to Q5 state
+        printf("I am alone in the network. Moving to state Q5...\n");
         node->state_handler = state_handlers[4];
         node->state_handler(node, net_join);
     }else{
@@ -77,7 +61,6 @@ int q5_state(void* n, void* data) {
         return 1;
     }
 
-    printf("The successor port is %d\n", node->successor_port);
     struct sockaddr_in addr = {0};
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = node->successor_ip_address.s_addr;
@@ -90,20 +73,18 @@ int q5_state(void* n, void* data) {
         return 1;
     }
 
-    printf("Successfully connected to successor: %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+    printf("Connected to the new successor: %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
 
     int send_status = send(node->sockfd_b, &net_join_response, sizeof(net_join_response), 0);
     if (send_status == -1) {
         perror("send failure");
         return 1;
     }
-
-    printf("Sent NET_JOIN_RESPONSE to successor.\n");
+    printf("The previous hash range was (%d, %d) ", node->hash_range_start, node->hash_range_end);
     node->hash_range_start = 0;  // Just for testing purposes
     node->hash_range_end = 127;  // Just for testing purposes
     node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
-
-    printf("Assigned hash range: Start=%d, End=%d, Span=%d\n", node->hash_range_start, node->hash_range_end, node->hash_span);
+    printf("The new hash range is (%d, %d)\n", node->hash_range_start, node->hash_range_end);
 
     struct sockaddr_in predecessor_addr = {0};
     socklen_t addr_len = sizeof(predecessor_addr);
@@ -122,7 +103,8 @@ int q5_state(void* n, void* data) {
     node->predecessor_port = ntohs(predecessor_addr.sin_port);
     node->sockfd_d = accept_status;
 
-    printf("Accepted predecessor: %s:%d\n", inet_ntoa(predecessor_addr.sin_addr), ntohs(predecessor_addr.sin_port));
+    printf("Accepted new predecessor: %s:%d\n", inet_ntoa(predecessor_addr.sin_addr),
+            ntohs(predecessor_addr.sin_port));
 
     // Transition to Q6 after accepting predecessor
     printf("Transitioning to state Q6...\n");

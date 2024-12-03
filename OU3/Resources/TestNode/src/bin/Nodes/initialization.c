@@ -6,7 +6,7 @@
 int q1_state(void* n, void* data) {
     Node* node = (Node*)n;
 
-    printf("q1 state\n");
+    printf("[q1 state]\n");
     struct STUN_LOOKUP_PDU stun_lookup;
     memset(&stun_lookup, 0, sizeof(stun_lookup));
     stun_lookup.type = STUN_LOOKUP;
@@ -53,7 +53,6 @@ int q1_state(void* n, void* data) {
     }
 
     node->port = ntohs(addr_listener.sin_port);
-    printf("Listener Port: %d\n", node->port);
 
    
     int send_status = sendto(node->sockfd_a, &stun_lookup, sizeof(stun_lookup), 0, node->tracker_addr->ai_addr,
@@ -70,7 +69,8 @@ int q1_state(void* n, void* data) {
         perror("getsockname failed");
         return 1;
     }
-
+    printf("The UDP socket is created and the port number is: %d\n", ntohs(addr.sin_port));
+    printf("The listener TCP socket is created and the port number is: %d\n", node->port);
     // we are now moving to the next state q2
     node->state_handler = state_handlers[1];
     node->state_handler(node, NULL);
@@ -85,7 +85,7 @@ int q2_state(void* n, void* data){
 
     Node* node = (Node*)n;
     // we will create a buffer to store the response from the tracker
-    printf("q2 state\n");
+    printf("[q2 state]\n");
     char buffer[1024];
     // nullify the buffer
     memset(buffer, 0, sizeof(buffer));
@@ -108,8 +108,9 @@ int q2_state(void* n, void* data){
     if (stun_response.type == STUN_RESPONSE){
         struct in_addr addr_pub = {stun_response.address};
         node->public_ip = addr_pub; // we are storing the public ip address of the node.
-        printf("the node's  Port: %d\n", node->port);
-        printf("Public IP: %s\n", inet_ntoa(addr_pub));
+        printf("GOT STUN RESPONSE, ");
+        printf("my address is: %s\n", inet_ntoa(node->public_ip));
+
     }
 
 
@@ -124,7 +125,7 @@ int q2_state(void* n, void* data){
 int q3_state(void* n, void* data){
 
     Node* node = (Node*)n;
-    printf("q3 state\n");
+    printf("[q3 state]\n");
     // we will send NET_GET_NODE to the tracker
     struct NET_GET_NODE_PDU net_get_node = {0};
     // just for check if the public ip is stored in the node
@@ -169,10 +170,8 @@ int q3_state(void* n, void* data){
 
 
         if (net_get_node_response->address == 0 && net_get_node_response->port == 0){
-            printf("Empty response from the Tracker\n");
-            // move to the state 4
-            printf(" we can here\n");
-            printf("we are about to move to the q4 state from q3\n");
+            printf("Empty response\n");
+            printf("I am the first node to join the network\n");
             node-> state_handler = state_handlers[3];
             node->state_handler(node, NULL);
         }else{
@@ -181,7 +180,6 @@ int q3_state(void* n, void* data){
             // it will contain the address and the port of the node.
             // the main task of the 
             node->state_handler = state_handlers[6]; // now we are going to the q7 state.
-            printf("we are about to move q7 state from q3\n");
             node->state_handler(node, net_get_node_response);
         }
 
