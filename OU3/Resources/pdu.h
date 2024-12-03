@@ -80,6 +80,21 @@ struct NET_LEAVING_PDU {
     uint16_t new_port;
 };
 
+
+/**
+* @brief VAL_INSERT_PDU (TCP/UDP)
+*
+* Contains an entry that is to be inserted into the network
+* 
+* | Field       | Bytes       | Value |
+* |-------------|-------------|-------|
+* | TYPE        | 1           | 100   |
+* | SSN         | 12          |       |
+* | NAME_LENGTH | 1           |       |
+* | NAME        | NAME_LENGTH |       |
+* | EMAIL_LENGTH| 1           |       |
+* | EMAIL       | EMAIL_LENGTH|       |
+*/
 struct VAL_INSERT_PDU {
     uint8_t type;
     uint8_t ssn[SSN_LENGTH];
@@ -117,17 +132,6 @@ struct STUN_LOOKUP_PDU {
 struct STUN_RESPONSE_PDU {
     uint8_t type;
     uint32_t address;
-};
-
-
-struct GET_SUCCESSOR_PDU {
-    uint8_t type;
-};
-
-struct GET_SUCCESSOR_RESPONSE_PDU {
-    uint8_t type;
-    uint32_t successor_address;
-    uint16_t successor_port;
 };
 
 #endif
