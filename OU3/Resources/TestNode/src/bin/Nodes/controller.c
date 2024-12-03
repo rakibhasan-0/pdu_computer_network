@@ -70,6 +70,8 @@ int q6_state(void* n, void* data){
                     return 0;
 
                 }else if(poll_fd[i].fd == node->listener_socket){
+
+                    printf("Received NET_JOIN_RESPONSE (Q6)\n");
                     struct sockaddr_in sender_addr;
                     socklen_t sender_addr_len = sizeof(sender_addr);
 
@@ -81,24 +83,8 @@ int q6_state(void* n, void* data){
                         return 1;
                     }
 
-                    if(buffer[0] == GET_SUCCESSOR){
-                        printf("Received GET_SUCCESSOR request from predecessor.\n");
-                        struct GET_SUCCESSOR_RESPONSE_PDU get_successor_response = {0};
-                        get_successor_response.type = GET_SUCCESSOR_RESPONSE;
-                        get_successor_response.successor_address = node->successor_ip_address.s_addr;
-                        get_successor_response.successor_port = htons(node->successor_port);
-
-                        int send_status = send(accept_status, &get_successor_response, sizeof(get_successor_response), 0);
-                        if (send_status == -1) {
-                            perror("send to predecessor failed");
-                            return 1;
-                        }
-
-                        printf("Sent GET_SUCCESSOR_RESPONSE to predecessor.\n");
-                    }
                     //close(accept_status);
-                    //close(node->listener_socket);
-            
+                    //close(node->listener_socket);            
                 
                 }
                 else if(poll_fd[i].fd == node->sockfd_b){
