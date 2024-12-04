@@ -105,10 +105,13 @@ int q6_state(void* n, void* data){
 
                 }
 
-                else if (poll_fd[i].fd == node->sockfd_d) {
-                    printf("we are about to receive a message on sockfd_d\n");
 
+                else if (poll_fd[i].fd == node->sockfd_d) {
+                    printf("We are about to receive a message on sockfd_d\n");
+
+                    // Buffer to store the raw data received
                     char buffer[1024] = {0};
+                    memset(buffer, 0, sizeof(buffer));
 
                     // Receive the raw data
                     int recv_status = recv(node->sockfd_d, buffer, sizeof(buffer), 0);
@@ -118,48 +121,57 @@ int q6_state(void* n, void* data){
                         return 1;
                     }
 
-                    // Validate that we received at least one byte to check the message type
+                    // Validate that at least one byte (message type) has been received
                     if (recv_status < sizeof(uint8_t)) {
                         printf("Received incomplete message\n");
                         return 1;
                     }
 
-                    // Read the message type from the first byte of the buffer
-                    uint8_t message_type = *(uint8_t*)buffer;
+                    // Extract the message type from the buffer
+                    uint8_t message_type = *(uint8_t *)buffer;
 
-                    // Handle the message based on its type
                     if (message_type == NET_JOIN) {
+                        // Validate that the full NET_JOIN_PDU was received
                         if (recv_status >= sizeof(struct NET_JOIN_PDU)) {
-                            struct NET_JOIN_PDU* net_join = (struct NET_JOIN_PDU*)buffer;
-                            printf("Received NET_JOIN message:\n");
+                            struct NET_JOIN_PDU *net_join = (struct NET_JOIN_PDU *)buffer;
+
+                            printf("Received NET_JOIN message in STATE 6:\n");
                             printf("  Source Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->src_address}));
                             printf("  Source Port: %d\n", ntohs(net_join->src_port));
                             printf("  Max Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->max_address}));
                             printf("  Max Port: %d\n", ntohs(net_join->max_port));
                             printf("  Max Span: %u\n", ntohl(net_join->max_span));
 
-                            // Call the handler for STATE_12
+                            // Transition to STATE_12 with the received NET_JOIN_PDU
                             node->state_handler = state_handlers[STATE_12];
                             node->state_handler(node, net_join);
                         } else {
-                            printf("Incomplete NET_JOIN message\n");
+                            printf("Incomplete NET_JOIN message received, likely due to padding or fragmentation.\n");
                         }
                     } else if (message_type == NET_CLOSE_CONNECTION) {
+                        // Validate that the full NET_CLOSE_CONNECTION_PDU was received
                         if (recv_status >= sizeof(struct NET_CLOSE_CONNECTION_PDU)) {
-    
-                            struct NET_CLOSE_CONNECTION_PDU* net_close_connection = (struct NET_CLOSE_CONNECTION_PDU*)buffer;
-                            printf("Received NET_CLOSE_CONNECTION message\n");
+                            struct NET_CLOSE_CONNECTION_PDU *net_close = (struct NET_CLOSE_CONNECTION_PDU *)buffer;
 
-                            // Call the handler for STATE_17
+                            printf("Received NET_CLOSE_CONNECTION message in STATE 6\n");
+
+                            // Transition to STATE_17 with the received NET_CLOSE_CONNECTION_PDU
                             node->state_handler = state_handlers[STATE_17];
-                            node->state_handler(node, NULL);
+                            node->state_handler(node, net_close);
                         } else {
-                            printf("Incomplete NET_CLOSE_CONNECTION message\n");
+                            printf("Incomplete NET_CLOSE_CONNECTION message received, likely due to padding or fragmentation.\n");
                         }
+                    } else {
+                        // Unknown message type
+                        printf("Received an unknown message type: %d\n", message_type);
                     }
                 }
 
-                    
+
+                
+                // TODO: I need to ensure that buffer that receives the message is correctly sized to receive the message
+                // or probably the big-little endianess is causing the issue.
+          
             }
         }
     }

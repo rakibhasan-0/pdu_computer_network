@@ -30,19 +30,39 @@ int q12_state(void* n, void* data) {
         net_join->max_address = node->public_ip.s_addr;
         net_join->max_port = node->port;
         net_join->max_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
+        
         printf("I am alone in the network. Moving to state Q5...\n");
+        printf("*************************************************************\n");
+        printf("The forwardes net_join_msg content\n");
+        printf("Type: %d\n", net_join->type);
+        printf("Source Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->src_address}));
+        printf("Source Port: %d\n", net_join->src_port);
+        printf("Max Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->max_address}));
+        printf("Max Port: %d\n", net_join->max_port);
+        printf("Max Span: %u\n", ntohl(net_join->max_span));
+        printf("***********************************************************\n");
+
         node->state_handler = state_handlers[4];
         node->state_handler(node, net_join);
     } else if(net_join->max_address == node->public_ip.s_addr){
         // now we will check if the max address is matches with the node's public address.
         // however, be cautious wiht the byte order.
-        printf("did we reach here\n");
+        printf("Moving to state Q13...That message was forwarded\n");
+        printf("*************************************************************\n");
+        printf("The forwardes net_join_msg content\n");
+        printf("Type: %d\n", net_join->type);
+        printf("Source Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->src_address}));
+        printf("Source Port: %d\n", net_join->src_port);
+        printf("Max Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->max_address}));
+        printf("Max Port: %d\n", net_join->max_port);
+        printf("Max Span: %u\n", ntohl(net_join->max_span));
+        printf("***********************************************************\n");
         // as it matched thus we assumed the node is the max node in the network.
         // it measn the node has the highest hash range.
         net_join->max_address = node->public_ip.s_addr;
         net_join->max_port = node->port;
         net_join->max_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
-        printf("I am the max node in the network. Moving to state Q5...\n");
+        printf("I am the max node in the network. Moving to state Q13...\n");
         node->state_handler = state_handlers[STATE_13];
         node->state_handler(node, net_join);
 
@@ -51,8 +71,7 @@ int q12_state(void* n, void* data) {
         // we will forward the NET_JOIN to the node's successor.
         // we will move to state 14.
         printf("Forwarding NET_JOIN to the successor...\n");
-        printf("max hash span: %d\n", net_join->max_span);
-        printf("nodes hash span: %d\n", node->hash_span);
+
         if(node->hash_span >= net_join->max_span){
             net_join->max_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
             net_join->max_address = node->public_ip.s_addr;
@@ -224,6 +243,16 @@ int q14_state(void* n, void* data){
     printf("[q14 state]\n");
     Node* node = (Node*)n;
     struct NET_JOIN_PDU* net_join = (struct NET_JOIN_PDU*)data;
+    printf("The message that forwarded to another node, Moving to state Q6...\n");
+    printf("*************************************************************\n");
+    printf("The forwardes net_join_msg content\n");
+    printf("Type: %d\n", net_join->type);
+    printf("Source Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->src_address}));
+    printf("Source Port: %d\n", net_join->src_port);
+    printf("Max Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->max_address}));
+    printf("Max Port: %d\n", net_join->max_port);
+    printf("Max Span: %u\n", ntohl(net_join->max_span));
+    printf("***********************************************************\n");
 
     // now we will forward the NET_JOIN to the node's successor.
     int send_status = send(node->sockfd_b, net_join, sizeof(*net_join), 0);
