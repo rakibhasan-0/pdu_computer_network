@@ -5,6 +5,15 @@ int q6_state(void* n, void* data){
 
     Node* node = (Node*)n;
     printf("[q6 state]\n");
+
+	/* For testing Q9
+    if () {
+        node->state_handler = state_handlers[9]; // Q9 state
+        node->state_handler(node, NULL);
+        return 0;
+    }
+	*/
+
     struct NET_ALIVE_PDU net_alive = {0};
     net_alive.type = NET_ALIVE;
    
