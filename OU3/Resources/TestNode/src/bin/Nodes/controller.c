@@ -140,7 +140,7 @@ int q6_state(void* n, void* data){
                             printf("  Source Port: %d\n", ntohs(net_join->src_port));
                             printf("  Max Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->max_address}));
                             printf("  Max Port: %d\n", ntohs(net_join->max_port));
-                            printf("  Max Span: %u\n", ntohl(net_join->max_span));
+                            printf("  Max Span: %u\n", net_join->max_span);
 
                             // Transition to STATE_12 with the received NET_JOIN_PDU
                             node->state_handler = state_handlers[STATE_12];

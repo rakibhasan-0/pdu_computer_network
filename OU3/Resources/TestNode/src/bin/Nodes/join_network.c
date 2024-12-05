@@ -97,6 +97,7 @@ int q7_state(void* n, void* data) {
     // updating the hash range of the node.
     node->hash_range_start = net_join_response.range_start;
     node->hash_range_end = net_join_response.range_end;
+    node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
     printf("New range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
    // we need to think about the port number of the predecessor...
     
@@ -144,9 +145,10 @@ int q8_state(void* n, void* data) {
     }
 
     node->successor_ip_address = addr.sin_addr;
-    node->successor_port = addr.sin_port;
+    node->successor_port = addr.sin_port; // it is sorted in network order.
 
     printf("Connected to successor %s:%d\n", inet_ntoa(node->successor_ip_address), ntohs(node->successor_port));
+    printf("successor port %d\n", ntohs(node->successor_port));
     
     // Move to the next state (q6)
     node->state_handler = state_handlers[5];
