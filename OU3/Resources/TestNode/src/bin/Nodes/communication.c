@@ -114,16 +114,64 @@ int q5_state(void* n, void* data) {
     return 0;
 }
 
+
+/*
+ * q9_state - Handles value operations (insertion, removal, lookup)
+ *
+ * This state is responsible for processing incoming PDUs related to value operations.
+ * It handles the following types of PDUs:
+ * - VAL_INSERT: Insert a value into the node's data structure.
+ * - VAL_REMOVE: Remove a value from the node's data structure.
+ * - VAL_LOOKUP: Lookup a value in the node's data structure.
+ *
+ * Steps:
+ * 1. Receive the PDU from the predecessor or successor.
+ * 2. Determine the type of PDU and process accordingly.
+ * 3. Perform the necessary operations on the node's data structure.
+ * 4. Transition back to Q6 state after processing the PDU.
+ *
+ * Parameters:
+ * - n: Pointer to the Node structure.
+ * - data: Additional data passed to the state (if any).
+ *
+ * Returns:
+ * - 0 on success.
+ * - 1 on failure.
+ */
 int q9_state(void* n, void* data) {
     Node* node = (Node*)n;
     printf("[q9 state]\n");
 
-    // Handle the specific operations for Q9 state
-    // For example, process incoming PDUs, update node state, etc.
+    struct PDU pdu;
+    struct sockaddr_in sender_addr;
+    socklen_t sender_addr_len = sizeof(sender_addr);
 
-    // Example: Print the current hash range
-    printf("Hash Range Start: %d\n", node->hash_range_start);
-    printf("Hash Range End: %d\n", node->hash_range_end);
+    int recv_status = recvfrom(node->sockfd_a, &pdu, sizeof(pdu), 0, (struct sockaddr*)&sender_addr, &sender_addr_len);
+    if (recv_status == -1) {
+        perror("recvfrom failed");
+        return 1;
+    }
+
+    switch (pdu.type) {
+        case VAL_INSERT:
+            // Handle value insertion
+            printf("Handling VAL_INSERT\n");
+            // Insert value into the node's data structure
+            break;
+        case VAL_REMOVE:
+            // Handle value removal
+            printf("Handling VAL_REMOVE\n");
+            // Remove value from the node's data structure
+            break;
+        case VAL_LOOKUP:
+            // Handle value lookup
+            printf("Handling VAL_LOOKUP\n");
+            // Lookup value in the node's data structure
+            break;
+        default:
+            printf("Unknown PDU type: %d\n", pdu.type);
+            break;
+    }
 
     // Transition back to Q6 state after handling Q9 operations
     node->state_handler = state_handlers[5]; // Q6 state
