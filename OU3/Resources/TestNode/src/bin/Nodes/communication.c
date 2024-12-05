@@ -113,3 +113,21 @@ int q5_state(void* n, void* data) {
 
     return 0;
 }
+
+int q9_state(void* n, void* data) {
+    Node* node = (Node*)n;
+    printf("[q9 state]\n");
+
+    // Handle the specific operations for Q9 state
+    // For example, process incoming PDUs, update node state, etc.
+
+    // Example: Print the current hash range
+    printf("Hash Range Start: %d\n", node->hash_range_start);
+    printf("Hash Range End: %d\n", node->hash_range_end);
+
+    // Transition back to Q6 state after handling Q9 operations
+    node->state_handler = state_handlers[5]; // Q6 state
+    node->state_handler(node, NULL);
+
+    return 0;
+}
