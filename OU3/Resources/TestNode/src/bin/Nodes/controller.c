@@ -55,6 +55,8 @@ int q6_state(void* n, void* data){
 
             if(poll_fd[i].revents == POLLIN){
 
+               //printf("Received something\n");
+
                 if(poll_fd[i].fd == node->sockfd_a){
                   
                     struct sockaddr_in sender_addr;
@@ -98,11 +100,65 @@ int q6_state(void* n, void* data){
                 }
                 else if(poll_fd[i].fd == node->sockfd_b){
                    // printf("we are about to recieve the NET_JOIN_RESPONSE from the state 5\n");
+                   // we need to check the messahe disconnect from the predecessor.
+                   
+
                 }
 
-                else if(poll_fd[i].fd == node->sockfd_d){
-                   //printf("we are about to recieve the GET_SUCCESSOR_RESPONSE from the state 8\n");
+                else if (poll_fd[i].fd == node->sockfd_d) {
+                    printf("we are about to receive a message on sockfd_d\n");
+
+                    char buffer[1024] = {0};
+
+                    // Receive the raw data
+                    int recv_status = recv(node->sockfd_d, buffer, sizeof(buffer), 0);
+
+                    if (recv_status == -1) {
+                        perror("recv failed");
+                        return 1;
+                    }
+
+                    // Validate that we received at least one byte to check the message type
+                    if (recv_status < sizeof(uint8_t)) {
+                        printf("Received incomplete message\n");
+                        return 1;
+                    }
+
+                    // Read the message type from the first byte of the buffer
+                    uint8_t message_type = *(uint8_t*)buffer;
+
+                    // Handle the message based on its type
+                    if (message_type == NET_JOIN) {
+                        if (recv_status >= sizeof(struct NET_JOIN_PDU)) {
+                            struct NET_JOIN_PDU* net_join = (struct NET_JOIN_PDU*)buffer;
+                            printf("Received NET_JOIN message:\n");
+                            printf("  Source Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->src_address}));
+                            printf("  Source Port: %d\n", ntohs(net_join->src_port));
+                            printf("  Max Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->max_address}));
+                            printf("  Max Port: %d\n", ntohs(net_join->max_port));
+                            printf("  Max Span: %u\n", ntohl(net_join->max_span));
+
+                            // Call the handler for STATE_12
+                            node->state_handler = state_handlers[STATE_12];
+                            node->state_handler(node, net_join);
+                        } else {
+                            printf("Incomplete NET_JOIN message\n");
+                        }
+                    } else if (message_type == NET_CLOSE_CONNECTION) {
+                        if (recv_status >= sizeof(struct NET_CLOSE_CONNECTION_PDU)) {
+    
+                            struct NET_CLOSE_CONNECTION_PDU* net_close_connection = (struct NET_CLOSE_CONNECTION_PDU*)buffer;
+                            printf("Received NET_CLOSE_CONNECTION message\n");
+
+                            // Call the handler for STATE_17
+                            node->state_handler = state_handlers[STATE_17];
+                            node->state_handler(node, NULL);
+                        } else {
+                            printf("Incomplete NET_CLOSE_CONNECTION message\n");
+                        }
+                    }
                 }
+
                     
             }
         }

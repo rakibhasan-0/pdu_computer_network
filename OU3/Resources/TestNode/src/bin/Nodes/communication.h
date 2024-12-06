@@ -20,6 +20,9 @@ typedef int (*state_handler_t)(void *node, void *data);
 int q5_state(void *node, void *data);
 int q12_state(void *node, void *data);
 int q9_state(void* n, void* data);
+int q14_state(void *node, void *data);
+int q13_state(void *node, void *data);
+int q17_state(void *node, void *data);
 
 // Array of state handler functions indexed by state constants
 extern state_handler_t state_handlers[];

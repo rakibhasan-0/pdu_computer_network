@@ -22,8 +22,6 @@
 
 #define STUN_LOOKUP 200
 #define STUN_RESPONSE 201
-#define GET_SUCCESSOR 50
-#define GET_SUCCESSOR_RESPONSE 51
 
 
 #ifndef PDU_DEF

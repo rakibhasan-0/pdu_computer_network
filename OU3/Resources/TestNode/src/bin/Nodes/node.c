@@ -2,16 +2,19 @@
 
 
 state_handler state_handlers[] = {
-    q1_state,
-    q2_state,
-    q3_state,
-    q4_state, 
-    q5_state,  
-    q6_state,   
-    q7_state,  
-    q12_state, 
-    q8_state,   
-	q9_state
+    q1_state, // 0
+    q2_state, // 1 
+    q3_state, // 2
+    q4_state, // 3
+    q5_state,  // 4
+    q6_state,   // 5
+    q7_state,  // 6
+    q12_state, // 7
+    q8_state,  // 8
+    q13_state, // 9
+    q14_state, // 10
+    q17_state,   // 11
+    q9_state, // 12
 };
 
 /*

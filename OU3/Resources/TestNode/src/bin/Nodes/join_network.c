@@ -85,6 +85,7 @@ int q7_state(void* n, void* data) {
     node->sockfd_d = accept_status;
 
     printf("Accepted new predecessor: %s:%d\n", inet_ntoa(sender_addr.sin_addr), ntohs(sender_addr.sin_port));
+   
 
     // now we are receiving the NET_JOIN_RESPONSE from the node or the node that has max hash range.
     int recv_status = recv(accept_status, &net_join_response, sizeof(net_join_response), 0);
@@ -93,6 +94,10 @@ int q7_state(void* n, void* data) {
         return 1;
     }
 
+    // updating the hash range of the node.
+    node->hash_range_start = net_join_response.range_start;
+    node->hash_range_end = net_join_response.range_end;
+    printf("New range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
    // we need to think about the port number of the predecessor...
     
     //close(node->listener_socket);
@@ -115,17 +120,17 @@ int q8_state(void* n, void* data) {
     Node* node = (Node*)n;
     struct NET_JOIN_RESPONSE_PDU net_join_response = *(struct NET_JOIN_RESPONSE_PDU*)data;
 
-    // connect to the successor
+    // connect to the successor as per state machine.
     struct sockaddr_in addr = {0};
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = ntohl(net_join_response.next_address);
+    addr.sin_addr.s_addr = htonl(net_join_response.next_address);
     addr.sin_port = net_join_response.next_port;
 
 
     printf("Connecting to successor %s:%d", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
     printf(" ...\n");
 
-    // Connect to the successor
+    // now we are onnecting to the successor
     node->sockfd_b = socket(AF_INET, SOCK_STREAM, 0);
     if (node->sockfd_b == -1) {
         perror("socket failure");
@@ -138,9 +143,12 @@ int q8_state(void* n, void* data) {
         return 1;
     }
 
-    printf("Connected to successor: %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+    node->successor_ip_address = addr.sin_addr;
+    node->successor_port = addr.sin_port;
+
+    printf("Connected to successor %s:%d\n", inet_ntoa(node->successor_ip_address), ntohs(node->successor_port));
     
-    // Move to the next state (q6) or handle additional logic
+    // Move to the next state (q6)
     node->state_handler = state_handlers[5];
     node->state_handler(node, NULL);
 

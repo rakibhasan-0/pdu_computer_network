@@ -15,11 +15,19 @@
 #include <poll.h>
 #include <time.h>
 #include <fcntl.h> 
+#include <math.h>
 #include "../../../../pdu.h"
 
 #include "initialization.h"
 #include "join_network.h"
 #include "controller.h"
+
+#define STATE_13 9
+#define STATE_14 10
+#define STATE_17 11
+#define STATE_6 5
+#define STATE_12 7
+#define STATE_9 12
 
 typedef struct Node Node;
 
