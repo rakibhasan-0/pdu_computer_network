@@ -28,7 +28,7 @@ int q1_state(void* n, void* data) {
     struct sockaddr_in addr_sock_c;
     memset(&addr_sock_c, 0, sizeof(addr_sock_c));
     addr_sock_c.sin_family = AF_INET;
-    addr_sock_c.sin_addr.s_addr = node->public_ip.s_addr;
+    //addr_sock_c.sin_addr.s_addr = node->public_ip.s_addr;
 
 
     int bind_status = bind(node->listener_socket, (struct sockaddr*)&addr_sock_c, sizeof(addr_sock_c));
@@ -153,6 +153,7 @@ int q3_state(void* n, void* data){
                             &node->tracker_addr->ai_addrlen);
 
     // removing the padding from the buffer and storing it in the net_get_node_response
+    // net_get_node_reponse is host
     memcpy(&net_get_node_response->type, buffer, sizeof(net_get_node_response->type));
     memcpy(&net_get_node_response->address, buffer + sizeof(net_get_node_response->type), sizeof(net_get_node_response->address));
     memcpy(&net_get_node_response->port, buffer + sizeof(net_get_node_response->type) + sizeof(net_get_node_response->address),
@@ -162,13 +163,12 @@ int q3_state(void* n, void* data){
     if (net_get_node_response->type == NET_GET_NODE_RESPONSE){
         struct in_addr addr;
         addr.s_addr = net_get_node_response->address;
-        
-
+        // we are assuming that the address is in the network order.
+       // we are changing the byte order of the port 
+        net_get_node_response->port = ntohs(net_get_node_response->port);
         printf("net get response aka entry node's IP: %s\n", inet_ntoa(addr));
-        printf("net get response aka entry node's node Port: %d\n", ntohs(net_get_node_response->port));
+        printf("net get response aka entry node's node Port: %d\n", net_get_node_response->port);
     
-
-
         if (net_get_node_response->address == 0 && net_get_node_response->port == 0){
             printf("Empty response\n");
             printf("I am the first node to join the network\n");

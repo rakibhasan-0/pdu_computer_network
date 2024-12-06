@@ -69,20 +69,28 @@ int q6_state(void* n, void* data){
                         continue;
                     }
 
+                    // convert the fields to the host order.
+                    printf("Received NET_JOIN (Q6) via UDP\n");
+                    net_join.src_address = net_join.src_address;
+                    net_join.src_port = ntohs(net_join.src_port);
+                    net_join.max_address = net_join.max_address;
+                    net_join.max_port = ntohs(net_join.max_port);
+                    net_join.max_span = net_join.max_span;
+
                     //printf("Received NET_JOIN (Q6)\n");
                     //printf("Type (Q6): %d\n", net_join.type);
-                    //printf("Source Address(Q6): %s\n", inet_ntoa((struct in_addr){.s_addr = net_join.src_address}));
-                    //printf("Source Port(Q6): %d\n", net_join.src_port);
+                    printf("Source Address(Q6): %s\n", inet_ntoa((struct in_addr){.s_addr = net_join.src_address}));
+                    printf("Source Port(Q6): %d\n", net_join.src_port);
                     //printf("Max address(Q6): %s\n", inet_ntoa((struct in_addr){.s_addr = net_join.max_address}));
                     //printf("Max Port(Q6): %d\n", net_join.max_port);
                     //printf("we are abour to move to the q12 state from q6\n");
-                    node->state_handler = state_handlers[7];
+                    node->state_handler = state_handlers[STATE_12];
                     node->state_handler(node, &net_join);
                     return 0;
 
                 }else if(poll_fd[i].fd == node->listener_socket){
 
-                    printf("Received NET_JOIN_RESPONSE (Q6)\n");
+                    printf("Received NET_JOIN_RESPONSE (Q6) through the listener socket\n");
                     struct sockaddr_in sender_addr;
                     socklen_t sender_addr_len = sizeof(sender_addr);
 
@@ -134,15 +142,17 @@ int q6_state(void* n, void* data){
                         // Validate that the full NET_JOIN_PDU was received
                         if (recv_status >= sizeof(struct NET_JOIN_PDU)) {
                             struct NET_JOIN_PDU *net_join = (struct NET_JOIN_PDU *)buffer;
-
-                            printf("Received NET_JOIN message in STATE 6:\n");
-                            printf("  Source Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->src_address}));
-                            printf("  Source Port: %d\n", ntohs(net_join->src_port));
-                            printf("  Max Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->max_address}));
-                            printf("  Max Port: %d\n", ntohs(net_join->max_port));
-                            printf("  Max Span: %u\n", net_join->max_span);
-
                             // Transition to STATE_12 with the received NET_JOIN_PDU
+
+                            // we have received the NET_JOIN message from the predecessor.
+                            printf("Received NET_JOIN message from the predecessor\n");
+                            // we will convert the fields to the host order.
+                            net_join->src_address = net_join->src_address;
+                            net_join->src_port = ntohs(net_join->src_port);
+                            net_join->max_address = net_join->max_address;
+                            net_join->max_port = net_join->max_port;
+                            net_join->max_span = net_join->max_span;
+
                             node->state_handler = state_handlers[STATE_12];
                             node->state_handler(node, net_join);
                         } else {

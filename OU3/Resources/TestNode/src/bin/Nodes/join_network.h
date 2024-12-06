@@ -9,8 +9,8 @@
 #include "utils.h"
 
 // State handler functions for each state
-int q4_state(void *node, void *data);
-int q7_state(void *node, void *data);
-int q8_state(void *node, void *data);
+int q4_state(void *n, void *data);
+int q7_state(void *n, void *data);
+int q8_state(void *n, void *data);
 
 #endif // JOIN_NETWORK_H
