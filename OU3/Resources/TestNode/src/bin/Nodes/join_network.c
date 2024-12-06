@@ -128,9 +128,6 @@ int q8_state(void* n, void* data) {
     addr.sin_port = net_join_response.next_port;
 
 
-    printf("Connecting to successor %s:%d", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
-    printf(" ...\n");
-
     // now we are onnecting to the successor
     node->sockfd_b = socket(AF_INET, SOCK_STREAM, 0);
     if (node->sockfd_b == -1) {

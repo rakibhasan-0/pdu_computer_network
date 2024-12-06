@@ -371,7 +371,8 @@ int q17_state(void* n, void* data) {
     // are already set in a consistent manner (host order for port).
     // If node->successor_port was not previously converted to host order,
     // make sure to do so at the time you set it.
-    uint16_t successor_port = htons(node->successor_port);
+    uint16_t successor_port = node->successor_port;
+
     printf("The successor node's address: %s\n", inet_ntoa(node->successor_ip_address));
     printf("The successor node's port: %d\n", successor_port);
 
