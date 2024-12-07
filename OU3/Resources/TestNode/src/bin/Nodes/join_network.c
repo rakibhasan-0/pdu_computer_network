@@ -106,6 +106,7 @@ int q7_state(void* n, void* data) {
     node->hash_range_end = net_join_response.range_end;
     node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
     printf("New range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
+    printf("Hash span: %d\n", node->hash_span);
 
     // Move to q8_state to connect to the successor
     node->state_handler = state_handlers[8];

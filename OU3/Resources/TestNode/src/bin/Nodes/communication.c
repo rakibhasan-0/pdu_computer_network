@@ -44,6 +44,7 @@ int q12_state(void* n, void* data) {
         printf("Source Port: %d\n", net_join->src_port);
         printf("Max Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->max_address}));
         printf("Max Port: %d\n", net_join->max_port);
+        printf("Max Span: %u\n", net_join->max_span);
         printf("***********************************************************\n");
 
         node->state_handler = state_handlers[STATE_5];
@@ -117,6 +118,7 @@ int q5_state(void* n, void* data) {
     
     uint8_t successor_start = 0, successor_end = 0;
     split_range(node, &successor_start, &successor_end);
+    node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
     printf("the successor start: %d, end: %d\n", successor_start, successor_end);
 
     // Prepare the NET_JOIN_RESPONSE PDU, 
@@ -262,7 +264,7 @@ int q14_state(void* n, void* data){
     struct NET_JOIN_PDU* net_join = (struct NET_JOIN_PDU*)data;
 
     
-    printf("The message that forwarded to another node, Moving to state Q6...\n");
+    printf("The message that forwarded to another node in Q14, Moving to state Q6...\n");
     printf("*************************************************************\n");
     printf("The forwardes net_join_msg content\n");
     printf("Source Address: %s\n", inet_ntoa((struct in_addr){.s_addr = net_join->src_address}));
@@ -347,6 +349,7 @@ int q13_state(void* n, void* data){
     uint8_t successor_start, successor_end;
     // now we will transfer the upper half of the hash range to the successor.
     split_range(node, &successor_start, &successor_end);
+    node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
 
     // Prepare the NET_JOIN_RESPONSE PDU    
     struct NET_JOIN_RESPONSE_PDU net_join_response = {0};
