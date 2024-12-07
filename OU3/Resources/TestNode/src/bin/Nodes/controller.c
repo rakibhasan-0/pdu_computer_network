@@ -115,7 +115,7 @@ int q6_state(void* n, void* data){
 
 
                 else if (poll_fd[i].fd == node->sockfd_d) {
-                    printf("We are about to receive a message on sockfd_d\n");
+                   // printf("We are about to receive a message on sockfd_d\n");
 
                     // Buffer to store the raw data received
                     char buffer[1024] = {0};
@@ -150,7 +150,7 @@ int q6_state(void* n, void* data){
                             net_join->src_address = net_join->src_address;
                             net_join->src_port = ntohs(net_join->src_port);
                             net_join->max_address = net_join->max_address;
-                            net_join->max_port = net_join->max_port;
+                            net_join->max_port = ntohs(net_join->max_port);
                             net_join->max_span = net_join->max_span;
 
                             node->state_handler = state_handlers[STATE_12];
@@ -171,9 +171,6 @@ int q6_state(void* n, void* data){
                         } else {
                             printf("Incomplete NET_CLOSE_CONNECTION message received, likely due to padding or fragmentation.\n");
                         }
-                    } else {
-                        // Unknown message type
-                        printf("Received an unknown message type: %d\n", message_type);
                     }
                 }
 

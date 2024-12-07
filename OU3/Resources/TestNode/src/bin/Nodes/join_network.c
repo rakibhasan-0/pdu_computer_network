@@ -15,6 +15,8 @@ int q4_state(void* n, void* data){
     node->hash_range_start = 0;
     node->hash_range_end = 255; // since there is only one node. 
     node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
+    printf("Node's hash range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
+    printf("Node's hash span: %d\n", node->hash_span);
 
     // start sending alive messages to the tracker
     node->state_handler = state_handlers[5]; // it will move to the q6 state
@@ -40,9 +42,6 @@ int q7_state(void* n, void* data) {
     // Construct the NET_JOIN_PDU to send
     struct NET_JOIN_PDU net_join = {0};
     net_join.type = NET_JOIN;
-
-    printf("the nodes public ip address: %s\n", inet_ntoa(node->public_ip));
-    printf("the nodes port: %d\n", node->port);
 
     // As we have already received host order or converted to host order in q3_state
     net_join.src_address = node->public_ip.s_addr;  
@@ -99,17 +98,15 @@ int q7_state(void* n, void* data) {
 
 
     printf("Received NET_JOIN_RESPONSE from predecessor\n");
-    printf("Successor: %s:%d\n", inet_ntoa((struct in_addr){.s_addr = net_join_response.next_address}), net_join_response.next_port);
-
     // we are updating the hash range of the node.
     node->hash_range_start = net_join_response.range_start;
     node->hash_range_end = net_join_response.range_end;
     node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
-    printf("New range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
-    printf("Hash span: %d\n", node->hash_span);
+    printf("Node's updated range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
+    printf("Node's updated hash range: %d\n", node->hash_span);
 
     // Move to q8_state to connect to the successor
-    node->state_handler = state_handlers[8];
+    node->state_handler = state_handlers[STATE_8];
     node->state_handler(node, &net_join_response);
 
     return 0;
@@ -125,11 +122,6 @@ int q8_state(void* n, void* data) {
 
     // net_join_response.next_address is in network order
     // net_join_response.next_port is in host order
-
-    // Print successor info
-    printf("Successor from the net_join_response : %s:%d\n",
-           inet_ntoa((struct in_addr){.s_addr = net_join_response.next_address}),
-           net_join_response.next_port);
 
     struct sockaddr_in addr = {0};
     addr.sin_family = AF_INET;
@@ -155,7 +147,7 @@ int q8_state(void* n, void* data) {
     node->successor_ip_address = addr.sin_addr;
     node->successor_port = net_join_response.next_port;
 
-    printf("After assigning the successor: %s:%d\n",
+    printf("Node's updated successor: %s:%d\n",
            inet_ntoa(node->successor_ip_address),
            node->successor_port);
 

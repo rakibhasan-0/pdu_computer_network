@@ -52,10 +52,9 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // to make ip address format
-   
 
-    printf("Node started and it is sending STUN_LOOKUP to the tracker %d, %d\n", argv[1], atoi(argv[2]));
+    printf("Node started and it is sending STUN_LOOKUP to the tracker %s:%d\n", argv[1], atoi(argv[2]));
+
     node->tracker_port = atoi(argv[2]);
     node->tracker_addr = res;
     node->state_handler = state_handlers[0]; // we are initializing the function pointer to point to the q1 state.
