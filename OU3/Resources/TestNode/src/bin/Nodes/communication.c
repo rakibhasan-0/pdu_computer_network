@@ -181,7 +181,7 @@ int q5_state(void* n, void* data) {
  * - 1 on failure.
  */
 
-/*
+
 int q9_state(void* n, void* data) {
     Node* node = (Node*)n;
     printf("[q9 state]\n");
@@ -222,7 +222,7 @@ int q9_state(void* n, void* data) {
     node->state_handler(node, NULL);
 
     return 0;
-}*/
+}
 
 
 // we will forward the NET_JOIN to the node's successor.
