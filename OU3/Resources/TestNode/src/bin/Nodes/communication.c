@@ -181,47 +181,57 @@ int q5_state(void* n, void* data) {
  * - 1 on failure.
  */
 
-
 int q9_state(void* n, void* data) {
     Node* node = (Node*)n;
     printf("[q9 state]\n");
 
-    struct PDU pdu; // you may want to use a buffer to check the type of the pdu?
+    // Example: Handle incoming PDUs for value operations
+    char buffer[1024];
     struct sockaddr_in sender_addr;
     socklen_t sender_addr_len = sizeof(sender_addr);
 
-    int recv_status = recvfrom(node->sockfd_a, &pdu, sizeof(pdu), 0, (struct sockaddr*)&sender_addr, &sender_addr_len);
+    int recv_status = recvfrom(node->sockfd_a, buffer, sizeof(buffer), 0, (struct sockaddr*)&sender_addr, &sender_addr_len);
     if (recv_status == -1) {
         perror("recvfrom failed");
         return 1;
     }
 
-    switch (pdu.type) {
+    uint8_t pdu_type = buffer[0]; // Assuming the first byte indicates the PDU type
+
+    switch (pdu_type) {
         case VAL_INSERT:
-            // Handle value insertion
             printf("Handling VAL_INSERT\n");
-            // Insert value into the node's data structure
+            handle_val_insert(node, (struct VAL_INSERT_PDU*)buffer);
             break;
         case VAL_REMOVE:
-            // Handle value removal
             printf("Handling VAL_REMOVE\n");
-            // Remove value from the node's data structure
+            handle_val_remove(node, (struct VAL_REMOVE_PDU*)buffer);
             break;
         case VAL_LOOKUP:
-            // Handle value lookup
             printf("Handling VAL_LOOKUP\n");
-            // Lookup value in the node's data structure
+            handle_val_lookup(node, (struct VAL_LOOKUP_PDU*)buffer);
             break;
         default:
-            printf("Unknown PDU type: %d\n", pdu.type);
+            printf("Unknown PDU type: %d\n", pdu_type);
             break;
     }
 
-    // Transition back to Q6 state after handling Q9 operations
-    node->state_handler = state_handlers[5]; // Q6 state
+    node->state_handler = state_handlers[5];
     node->state_handler(node, NULL);
 
     return 0;
+}
+
+void handle_val_insert(Node* node, struct VAL_INSERT_PDU* pdu) {
+    printf("Inserting value with SSN: %s\n", pdu->ssn);
+}
+
+void handle_val_remove(Node* node, struct VAL_REMOVE_PDU* pdu) {
+    printf("Removing value with SSN: %s\n", pdu->ssn);
+}
+
+void handle_val_lookup(Node* node, struct VAL_LOOKUP_PDU* pdu) {
+    printf("Looking up value with SSN: %s\n", pdu->ssn);
 }
 
 
