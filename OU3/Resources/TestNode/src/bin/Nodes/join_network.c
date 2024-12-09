@@ -13,7 +13,9 @@ int q4_state(void* n, void* data){
     node->predecessor_port = 0;
     node->successor_port = 0;
     node->hash_range_start = 0;
-    node->hash_range_end = 255; // since there is only one node. 
+    node->hash_range_end = 255; // since there is only one node.
+    node->sockfd_b = -1;
+    node->sockfd_d = -1;
     node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
     printf("Node's hash range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
     printf("Node's hash span: %d\n", node->hash_span);
