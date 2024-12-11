@@ -355,9 +355,15 @@ int q13_state(void* n, void* data){
 int q17_state(void* n, void* data) {
     printf("[q17 state]\n");
     Node* node = (Node*)n;
-    // Close the previous socket connection
-    shutdown(node->sockfd_d, SHUT_RDWR);
-    close(node->sockfd_d);
+
+    // Close the previous socket connection aka the connection with the predecessor.
+    if(node->sockfd_d >= 0){
+        shutdown(node->sockfd_d, SHUT_RDWR);
+        close(node->sockfd_d);
+        node->sockfd_d = -1;
+        node->predecessor_ip_address.s_addr = INADDR_NONE;
+        node->predecessor_port = 0;
+    }
 
     // Here we assume node->successor_ip_address and node->successor_port
     // are already set in a consistent manner (host order for port).
