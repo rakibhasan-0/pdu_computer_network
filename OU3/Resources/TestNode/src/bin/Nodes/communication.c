@@ -369,7 +369,7 @@ int q17_state(void* n, void* data) {
     // are already set in a consistent manner (host order for port).
     // If node->successor_port was not previously converted to host order,
     // make sure to do so at the time you set it.
-
+    printf("the node's hash range start: %d, end: %d\n", node->hash_range_start, node->hash_range_end);
     // Check if this is the only node in the network
     if (node->hash_range_start == 0 && node->hash_range_end == 255) {
         printf("I am the only node in the network. Moving to state Q6...\n");
@@ -384,6 +384,7 @@ int q17_state(void* n, void* data) {
 
     printf("Accepting new predecessor...\n");
 
+    //TODO: we may need to add fctl to set the socket to non-blocking
     int accept_status = accept(node->listener_socket, (struct sockaddr*)&predecessor_addr, &addr_len);
     if (accept_status == -1) {
         perror("accept failed");
