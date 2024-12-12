@@ -6,10 +6,11 @@
 #include <netinet/in.h>
 
 #include "node.h"
-#include "communication.h"
 #include "join_network.h"
-#include "controller.h"   
-
+#include "controller.h"
+#include "utils.h"
+#include "signal_handler.h"   
+#include "initialization.h"
 
 
 

@@ -14,7 +14,12 @@ state_handler state_handlers[] = {
     q13_state, // 9
     q14_state, // 10
     q17_state,   // 11
-    q9_state // 12
+    q10_state, // 12
+    q11_state, // 13
+    q15_state, // 14
+    q18_state, // 15
+    q16_state, // 16
+    q9_state, // 17
 };
 
 /*
@@ -23,6 +28,7 @@ Steps:
 -STUN_LOOKUP in order to test communication with the tracker
 */
 
+volatile sig_atomic_t should_close = 0; // creaeting should_close as a global variable, initially it is set to 0 as false.
 
 int main(int argc, char* argv[]) {
 
@@ -41,6 +47,8 @@ int main(int argc, char* argv[]) {
         perror("malloc ");
         return 1;
     }
+
+    register_signal_handlers(); // we are about to register the signal handlers.
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;

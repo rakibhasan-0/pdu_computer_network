@@ -16,23 +16,31 @@
 #include <time.h>
 #include <fcntl.h> 
 #include <math.h>
+#include <signal.h>
+#include <errno.h>
 #include "../../../../pdu.h"
 
 #include "initialization.h"
 #include "join_network.h"
 #include "controller.h"
+#include "communication.h"
+#include "signal_handler.h"
+#include "utils.h"
 
 #define STATE_13 9
 #define STATE_14 10
 #define STATE_17 11
 #define STATE_6 5
-#define STATE_12 7
 #define STATE_9 12
 #define STATE_5 4
 #define STATE_12 7
 #define STATE_8 8
-//#define STATE_9 3
-
+#define STATE_10 12
+#define STATE_11 13
+#define STATE_15 14
+#define STATE_18 15
+#define STATE_16 16
+#define STATE_9 17
 
 typedef struct Node Node;
 
@@ -71,5 +79,8 @@ struct Node {
 // Function pointer for state handlers
 typedef int (*state_handler)(void *node, void *data);
 extern state_handler state_handlers[];
+
+// Global variable to indicate if the program should close
+extern volatile sig_atomic_t should_close;
 
 #endif // NODE_H

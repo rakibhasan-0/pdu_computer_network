@@ -1,5 +1,13 @@
 #include "controller.h"
 
+
+// if the node is not connected after receiving sigint signal, we will close the connection.
+
+
+
+
+
+
 // based on the graph, I(gazi) think that state_6 kinda core since most states are being handled from here.
 int q6_state(void* n, void* data){
 
@@ -35,38 +43,43 @@ int q6_state(void* n, void* data){
             timeout = 7;
         }
 
-        int poll_status = poll(poll_fd, 4, 500); 
-        if (poll_status == -1){
-            perror("poll failure");
+        int poll_status = poll(poll_fd, 4, 100);
+
+        if (poll_status == -1 && errno != EINTR) {
+            perror("poll failed");
             return 1;
-        }else if (poll_status == 0){
-            continue;
         }
+
+        if (should_close) {
+            node->state_handler = state_handlers[STATE_10];
+            node->state_handler(node, NULL);
+            return 0;
+        }
+
 
         for(int i = 0; i < 4; i++){
 
             if(poll_fd[i].revents == POLLIN){
+                // clearning the revents
+                poll_fd[i].revents = 0;
 
-               printf("Received something\n");
+               //printf("Received something\n");
 
                 if(poll_fd[i].fd == node->sockfd_a){
-					printf("Received something2\n");
-				    char buffer[1024];
+				    /*char buffer[1024];
 					struct sockaddr_in sender_addr;
-                    struct NET_JOIN_PDU net_join = {0};
 					socklen_t sender_addr_len = sizeof(sender_addr);
 					int recv_status = recvfrom(node->sockfd_a, buffer, sizeof(buffer), 0, (struct sockaddr*)&sender_addr, &sender_addr_len);
 					if (recv_status == -1) {
 						perror("recvfrom failed");
 						return 1;
 					}
-					printf("Received something3\n");
+
 					uint8_t pdu_type = buffer[0]; // the first byte indicates the PDU type
 					switch (pdu_type) {
 						case VAL_INSERT:
 						case VAL_REMOVE:
 						case VAL_LOOKUP:
-							printf("Received something4\n");
 							node->state_handler = state_handlers[STATE_9];
 							node->state_handler(node, buffer);
 							break;
@@ -74,6 +87,10 @@ int q6_state(void* n, void* data){
 							printf("Unknown PDU type: %d\n", pdu_type);
 							break;	
 					}
+					*/
+                    struct sockaddr_in sender_addr;
+                    socklen_t sender_addr_len = sizeof(sender_addr);
+                    struct NET_JOIN_PDU net_join = {0};
 
                     int rcv_data = recvfrom(node->sockfd_a, &net_join, sizeof(net_join), 0, (struct sockaddr *)&sender_addr, &sender_addr_len);
                     if (rcv_data == -1) {
@@ -119,15 +136,27 @@ int q6_state(void* n, void* data){
                 
                 }
                 else if(poll_fd[i].fd == node->sockfd_b){
-                   // printf("we are about to recieve the NET_JOIN_RESPONSE from the state 5\n");
-                   // we need to check the messahe disconnect from the predecessor.
-                   
+                    // it is empty so far, but I guess we may need to handle NET_NEW_RANGE message here?
+                    // we shall catch the NET_CLOSE_CONNECTION message here, since we send the net_leave message from the node's successor.
+                    char buffer[1024];
+                    memset(buffer, 0, sizeof(buffer));
+                    int recv_status = recv(node->sockfd_b, buffer, sizeof(buffer), 0);
+                    if (recv_status == -1) {
+                        perror("recv failed");
+                        return 1;
+                    }
+
+                    uint8_t message_type = *(uint8_t *)buffer;
+                    if(message_type == NET_LEAVING){
+                        node->state_handler = state_handlers[STATE_16];
+                        node->state_handler(node, buffer);
+                    }
+
 
                 }
 
 
                 else if (poll_fd[i].fd == node->sockfd_d) {
-                   // printf("We are about to receive a message on sockfd_d\n");
 
                     // Buffer to store the raw data received
                     char buffer[1024] = {0};
@@ -141,11 +170,6 @@ int q6_state(void* n, void* data){
                         return 1;
                     }
 
-                    // Validate that at least one byte (message type) has been received
-                    if (recv_status < sizeof(uint8_t)) {
-                        printf("Received incomplete message\n");
-                        return 1;
-                    }
 
                     // Extract the message type from the buffer
                     uint8_t message_type = *(uint8_t *)buffer;
@@ -167,8 +191,6 @@ int q6_state(void* n, void* data){
 
                             node->state_handler = state_handlers[STATE_12];
                             node->state_handler(node, net_join);
-                        } else {
-                            printf("Incomplete NET_JOIN message received, likely due to padding or fragmentation.\n");
                         }
                     } else if (message_type == NET_CLOSE_CONNECTION) {
                         // Validate that the full NET_CLOSE_CONNECTION_PDU was received
@@ -180,19 +202,25 @@ int q6_state(void* n, void* data){
                             // Transition to STATE_17 with the received NET_CLOSE_CONNECTION_PDU
                             node->state_handler = state_handlers[STATE_17];
                             node->state_handler(node, net_close);
-                        } else {
-                            printf("Incomplete NET_CLOSE_CONNECTION message received, likely due to padding or fragmentation.\n");
                         }
                     }
+
+                    else if(message_type == NET_NEW_RANGE){
+                        // we will update the new hash range.
+                        printf("Received NET_NEW_RANGE message in STATE 6\n");
+                        printf("we are sending data to the STATE 15\n");
+                        // we are moving to the state 15.
+                        node->state_handler = state_handlers[STATE_15];
+                        node->state_handler(node, buffer);
+                    }
                 }
-
-
                 
                 // TODO: I need to ensure that buffer that receives the message is correctly sized to receive the message
                 // or probably the big-little endianess is causing the issue.
           
             }
         }
+
     }
 
     return 0;

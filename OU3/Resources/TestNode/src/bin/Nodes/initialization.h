@@ -5,6 +5,9 @@
 #include "communication.h"
 #include "join_network.h"
 #include "controller.h" 
+#include "signal_handler.h"
+#include "utils.h"
+
 
 // Function prototypes for all state functions
 int q1_state(void* n, void* data);

@@ -5,9 +5,12 @@
 #include "node.h"
 #include "communication.h"
 #include "join_network.h"
+#include "signal_handler.h"
+#include "utils.h"
+#include "initialization.h"
+
 
 
 int q6_state(void* n, void* data);
-
 
 #endif

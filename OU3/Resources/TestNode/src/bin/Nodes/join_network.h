@@ -7,6 +7,9 @@
 #include "communication.h"
 #include "controller.h"
 #include "utils.h"
+#include "signal_handler.h"
+#include "initialization.h"
+
 
 // State handler functions for each state
 int q4_state(void *n, void *data);

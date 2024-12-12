@@ -181,6 +181,7 @@ int q5_state(void* n, void* data) {
  * - 1 on failure.
  */
 
+/**
 int q9_state(void* n, void* data) {
     Node* node = (Node*)n;
     printf("[Q9 state]\n");
@@ -234,6 +235,7 @@ void handle_val_lookup(Node* node, struct VAL_LOOKUP_PDU* pdu) {
     printf("Looking up value with SSN: %s\n", pdu->ssn);
 }
 
+**/
 
 // we will forward the NET_JOIN to the node's successor.
 int q14_state(void* n, void* data){
@@ -293,7 +295,7 @@ int q13_state(void* n, void* data){
     // connect to the prospect aka the new node
     struct sockaddr_in addr = {0};
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = net_join->src_address; // net_join message is host order.
+    addr.sin_addr.s_addr = net_join->src_address; // net_join messacge is host order.
     addr.sin_port = htons(net_join->src_port);
     // close the previous socket connection
     shutdown(node->sockfd_b, SHUT_RDWR);
