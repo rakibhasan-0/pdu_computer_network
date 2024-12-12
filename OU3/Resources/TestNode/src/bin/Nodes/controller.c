@@ -47,23 +47,26 @@ int q6_state(void* n, void* data){
 
             if(poll_fd[i].revents == POLLIN){
 
-               //printf("Received something\n");
+               printf("Received something\n");
 
                 if(poll_fd[i].fd == node->sockfd_a){
-				    /*char buffer[1024];
+					printf("Received something2\n");
+				    char buffer[1024];
 					struct sockaddr_in sender_addr;
+                    struct NET_JOIN_PDU net_join = {0};
 					socklen_t sender_addr_len = sizeof(sender_addr);
 					int recv_status = recvfrom(node->sockfd_a, buffer, sizeof(buffer), 0, (struct sockaddr*)&sender_addr, &sender_addr_len);
 					if (recv_status == -1) {
 						perror("recvfrom failed");
 						return 1;
 					}
-
+					printf("Received something3\n");
 					uint8_t pdu_type = buffer[0]; // the first byte indicates the PDU type
 					switch (pdu_type) {
 						case VAL_INSERT:
 						case VAL_REMOVE:
 						case VAL_LOOKUP:
+							printf("Received something4\n");
 							node->state_handler = state_handlers[STATE_9];
 							node->state_handler(node, buffer);
 							break;
@@ -71,10 +74,6 @@ int q6_state(void* n, void* data){
 							printf("Unknown PDU type: %d\n", pdu_type);
 							break;	
 					}
-					*/
-                    struct sockaddr_in sender_addr;
-                    socklen_t sender_addr_len = sizeof(sender_addr);
-                    struct NET_JOIN_PDU net_join = {0};
 
                     int rcv_data = recvfrom(node->sockfd_a, &net_join, sizeof(net_join), 0, (struct sockaddr *)&sender_addr, &sender_addr_len);
                     if (rcv_data == -1) {

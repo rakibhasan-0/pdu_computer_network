@@ -89,6 +89,7 @@ int q7_state(void* n, void* data);
 int q5_state(void* n, void* data);
 int q12_state(void* n, void* data);
 int q8_state(void* n, void* data);
+int q9_state(void* n, void* data);
 uint8_t calulate_hash_span(uint8_t start, uint8_t end);
 
 typedef int (*state_handler[])(void*, void*); // function pointer to manage the states

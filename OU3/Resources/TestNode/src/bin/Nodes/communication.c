@@ -183,40 +183,40 @@ int q5_state(void* n, void* data) {
 
 int q9_state(void* n, void* data) {
     Node* node = (Node*)n;
-    printf("[q9 state]\n");
+    printf("[Q9 state]\n");
 
-    // Example: Handle incoming PDUs for value operations
-    char buffer[1024];
-    struct sockaddr_in sender_addr;
-    socklen_t sender_addr_len = sizeof(sender_addr);
-
-    int recv_status = recvfrom(node->sockfd_a, buffer, sizeof(buffer), 0, (struct sockaddr*)&sender_addr, &sender_addr_len);
-    if (recv_status == -1) {
-        perror("recvfrom failed");
-        return 1;
-    }
-
+    char* buffer = (char*)data;
     uint8_t pdu_type = buffer[0]; // Assuming the first byte indicates the PDU type
+    printf("PDU type: %d\n", pdu_type);
 
     switch (pdu_type) {
         case VAL_INSERT:
             printf("Handling VAL_INSERT\n");
-            handle_val_insert(node, (struct VAL_INSERT_PDU*)buffer);
+            struct VAL_INSERT_PDU* val_insert_pdu = (struct VAL_INSERT_PDU*)buffer;
+            printf("SSN: %s\n", val_insert_pdu->ssn);
+            printf("Name Length: %d\n", val_insert_pdu->name_length);
+            printf("Email Length: %d\n", val_insert_pdu->email_length);
+            handle_val_insert(node, val_insert_pdu);
             break;
         case VAL_REMOVE:
             printf("Handling VAL_REMOVE\n");
-            handle_val_remove(node, (struct VAL_REMOVE_PDU*)buffer);
+            struct VAL_REMOVE_PDU* val_remove_pdu = (struct VAL_REMOVE_PDU*)buffer;
+            printf("SSN: %s\n", val_remove_pdu->ssn);
+            handle_val_remove(node, val_remove_pdu);
             break;
         case VAL_LOOKUP:
             printf("Handling VAL_LOOKUP\n");
-            handle_val_lookup(node, (struct VAL_LOOKUP_PDU*)buffer);
+            struct VAL_LOOKUP_PDU* val_lookup_pdu = (struct VAL_LOOKUP_PDU*)buffer;
+            printf("SSN: %s\n", val_lookup_pdu->ssn);
+            handle_val_lookup(node, val_lookup_pdu);
             break;
         default:
             printf("Unknown PDU type: %d\n", pdu_type);
             break;
     }
 
-    node->state_handler = state_handlers[5];
+    // Transition back to Q6 state after processing the PDU
+    node->state_handler = state_handlers[STATE_6];
     node->state_handler(node, NULL);
 
     return 0;

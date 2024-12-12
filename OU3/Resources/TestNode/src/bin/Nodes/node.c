@@ -14,7 +14,7 @@ state_handler state_handlers[] = {
     q13_state, // 9
     q14_state, // 10
     q17_state,   // 11
-    //q9_state, // 12
+    q9_state // 12
 };
 
 /*
