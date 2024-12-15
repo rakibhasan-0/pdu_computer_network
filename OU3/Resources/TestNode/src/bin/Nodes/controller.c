@@ -152,6 +152,14 @@ int q6_state(void* n, void* data){
                         node->state_handler(node, buffer);
                     }
 
+                    if(message_type == NET_NEW_RANGE){
+                        printf("Received NET_NEW_RANGE message in STATE 6\n");
+                        printf("we are sending data to the STATE 15\n");
+                        // we are moving to the state 15.
+                        node->state_handler = state_handlers[STATE_15];
+                        node->state_handler(node, buffer);
+                    }
+
 
                 }
 
