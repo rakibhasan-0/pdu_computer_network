@@ -75,80 +75,114 @@ void register_signal_handlers(){
 
 // state 11, we will handle that state when there are predecessor and successor for the node.
 
-int q11_state(void* n, void* data){
+int q11_state(void* n, void* data) {
     printf("[q11 state]\n");
 
     Node* node = (Node*)n;
-    // we will send NET_NEW_RING message to the successor.
-    // even though in the state diagaram it stated that one can send the message either
-    // to the predecessor or successor.
-    // but sending the message to the successor is more intuitive.
+
+    // Preparing NET_NEW_RANGE message
     struct NET_NEW_RANGE_PDU net_new_range = {0};
     net_new_range.type = NET_NEW_RANGE;
     net_new_range.range_start = node->hash_range_start;
     net_new_range.range_end = node->hash_range_end;
 
-    // we are sending the NET_NEW_RANGE message to the successor.
-    int send_status = send(node->sockfd_b, &net_new_range, sizeof(net_new_range), 0);
-    printf("Sending NET_NEW_RANGE message to the successor\n");
-    if (send_status == -1){
-        perror("send failed");
-        return 1;
+    // Now we are deciding whether to send the message to the successor or the predecessor.
+    bool send_to_successor = node->hash_range_start == 0;
+
+    // Send NET_NEW_RANGE message
+    int send_status;
+    if (send_to_successor) {
+        printf("Sending NET_NEW_RANGE message to the successor\n");
+        send_status = send(node->sockfd_b, &net_new_range, sizeof(net_new_range), 0);
+        if (send_status == -1) {
+            perror("send to successor failed");
+            return 1;
+        }
+        printf("The successor is %s:%d\n", inet_ntoa(node->successor_ip_address), node->successor_port);
+    } else {
+        printf("Sending NET_NEW_RANGE message to the predecessor\n");
+        send_status = send(node->sockfd_d, &net_new_range, sizeof(net_new_range), 0);
+        if (send_status == -1) {
+            perror("send to predecessor failed");
+            return 1;
+        }
+        printf("The predecessor is %s:%d\n", inet_ntoa(node->predecessor_ip_address), node->predecessor_port);
     }
 
-    printf("the successor is %s:%d\n", inet_ntoa(node->successor_ip_address), node->successor_port);
-    // here we will receive the NET_NEW_RANGE_RESPONSE message from the successor.
+    // Receive NET_NEW_RANGE_RESPONSE
     struct NET_NEW_RANGE_RESPONSE_PDU net_new_range_response = {0};
-    int recv_status = recv(node->sockfd_b, &net_new_range_response, sizeof(net_new_range_response), 0);
-    if (recv_status == -1){
+    int recv_status;
+    if (send_to_successor) {
+        recv_status = recv(node->sockfd_b, &net_new_range_response, sizeof(net_new_range_response), 0);
+    } else {
+        recv_status = recv(node->sockfd_d, &net_new_range_response, sizeof(net_new_range_response), 0);
+    }
+
+    if (recv_status == -1) {
         perror("recv failed");
         return 1;
     }
 
-    if(net_new_range_response.type == NET_NEW_RANGE_RESPONSE){
-        printf("now we are moving to the state 18\n");
+    if (net_new_range_response.type == NET_NEW_RANGE_RESPONSE) {
+        printf("Received NET_NEW_RANGE_RESPONSE. Moving to STATE_18.\n");
         node->state_handler = state_handlers[STATE_18];
         node->state_handler(node, NULL);
     }
-
     return 0;
 }
 
-
-
-// state 15, where we will update the hash range of the successor.
-int q15_state(void* n, void* data){
+// state 15, where we will update the hash range dynamically and decide the response target.
+int q15_state(void* n, void* data) {
 
     printf("[q15 state]\n");
-    printf("we are in the state 15\n");
+    printf("We are in state 15\n");
+
     Node* node = (Node*)n;
     struct NET_NEW_RANGE_PDU* net_new_range = (struct NET_NEW_RANGE_PDU*)data;
 
-    printf("Received NET_NEW_RANGE message from the predecessor\n");
+    printf("Received NET_NEW_RANGE message\n");
     printf("New range start: %d\n", net_new_range->range_start);
     printf("New range end: %d\n", net_new_range->range_end);
-    printf("the node's rnanage start is %d\n", node->hash_range_start);
-    printf("the node's range end is %d\n", node->hash_range_end);
-    
+    printf("Node's current range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
 
-    // now we will invoke the fucntion to update the hash range of the node.
-    update_hash_range(node, net_new_range->range_start, net_new_range->range_end);
+    // Determine whether to send the response to the successor or the predecessor
+    bool send_to_successor = (node->hash_range_end != 255 && net_new_range->range_start == node->hash_range_end + 1);
 
-    // now we will send NET_NEW_RANGE_RESPONSE message to the predecessor.
-    struct NET_NEW_RANGE_RESPONSE_PDU net_new_range_response = {0};
-    net_new_range_response.type = NET_NEW_RANGE_RESPONSE;
+    if (send_to_successor) {
+        // Update hash range for successor
+        printf("Sending NET_NEW_RANGE_RESPONSE to the successor\n");
+        update_hash_range(node, node->hash_range_start, net_new_range->range_end);
 
-    printf("the prededcessor socket is %d\n", node->sockfd_d);
-    printf("the predecessor is %s:%d\n", inet_ntoa(node->predecessor_ip_address), node->predecessor_port);
-    // we are sending the NET_NEW_RANGE_RESPONSE message to the predecessor.
-    int send_status = send(node->sockfd_d, &net_new_range_response, sizeof(net_new_range_response), 0);
-    printf("Sending NET_NEW_RANGE_RESPONSE message to the predecessor\n");
-    if (send_status == -1){
-        perror("send failed");
-        return 1;
+        struct NET_NEW_RANGE_RESPONSE_PDU net_new_range_response = {0};
+        net_new_range_response.type = NET_NEW_RANGE_RESPONSE;
+
+        printf("The successor is %s:%d\n", inet_ntoa(node->successor_ip_address), node->successor_port);
+        int send_status = send(node->sockfd_b, &net_new_range_response, sizeof(net_new_range_response), 0);
+        if (send_status == -1) {
+            perror("Send failed");
+            return 1;
+        }
+    } else {
+        // Update hash range for predecessor
+        printf("Sending NET_NEW_RANGE_RESPONSE to the predecessor\n");
+        update_hash_range(node, net_new_range->range_start, node->hash_range_end);
+
+        struct NET_NEW_RANGE_RESPONSE_PDU net_new_range_response = {0};
+        net_new_range_response.type = NET_NEW_RANGE_RESPONSE;
+
+        printf("The predecessor is %s:%d\n", inet_ntoa(node->predecessor_ip_address), node->predecessor_port);
+        int send_status = send(node->sockfd_d, &net_new_range_response, sizeof(net_new_range_response), 0);
+        if (send_status == -1) {
+            perror("Send failed");
+            return 1;
+        }
     }
 
-    printf("now we are moving to the state 6\n");
+    // Log the updated hash range
+    printf("Updated node's range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
+
+    // Move to state 6 after completing the update
+    printf("Now moving to state 6\n");
     node->state_handler = state_handlers[STATE_6];
     node->state_handler(node, NULL);
 
@@ -156,18 +190,28 @@ int q15_state(void* n, void* data){
 }
 
 
-
 // the Q18 state, where we will close the connection with the predecessor and successor and exit gracefully.
 int q18_state(void* n, void* data){
 
     printf("[q18 state]\n");
 
+    Node* node = (Node*)n;
+
     // as we have updated the hash range to the node's successor, I mean we have mereged the hash range.
     // here we will transfer the data to the successor.
+    bool to_successor = false;
+    if(node->hash_range_start == 0){
+        to_successor = true;
+    }
+
+    if(to_successor){
+        // data transfer to the successor shall be implemented here, I mean all the data shall be transferred to the successor.
+    }else{
+        // data transfer to the predecessor shall be implemented here, I mean all the data shall be transferred to the predecessor.
+    }
 
     // data transfer to the successor shall be implemented here, I mean all the data shall be transferred to the successor.
 
-    Node* node = (Node*)n;
     // now we will send NET_CLOSE_CONNECTION message to the successor.
     struct NET_CLOSE_CONNECTION_PDU net_close_connection = {0};
     net_close_connection.type = NET_CLOSE_CONNECTION;

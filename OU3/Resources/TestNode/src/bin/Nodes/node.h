@@ -31,7 +31,6 @@
 #define STATE_14 10
 #define STATE_17 11
 #define STATE_6 5
-#define STATE_9 12
 #define STATE_5 4
 #define STATE_12 7
 #define STATE_8 8
