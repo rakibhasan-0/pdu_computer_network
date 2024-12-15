@@ -66,7 +66,7 @@ int q6_state(void* n, void* data){
                //printf("Received something\n");
 
                 if(poll_fd[i].fd == node->sockfd_a){
-				    /*char buffer[1024];
+				    char buffer[1024];
 					struct sockaddr_in sender_addr;
 					socklen_t sender_addr_len = sizeof(sender_addr);
 					int recv_status = recvfrom(node->sockfd_a, buffer, sizeof(buffer), 0, (struct sockaddr*)&sender_addr, &sender_addr_len);
@@ -87,9 +87,6 @@ int q6_state(void* n, void* data){
 							printf("Unknown PDU type: %d\n", pdu_type);
 							break;	
 					}
-					*/
-                    struct sockaddr_in sender_addr;
-                    socklen_t sender_addr_len = sizeof(sender_addr);
                     struct NET_JOIN_PDU net_join = {0};
 
                     int rcv_data = recvfrom(node->sockfd_a, &net_join, sizeof(net_join), 0, (struct sockaddr *)&sender_addr, &sender_addr_len);
