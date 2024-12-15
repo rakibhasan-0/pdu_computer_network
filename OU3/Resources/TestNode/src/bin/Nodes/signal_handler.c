@@ -212,7 +212,6 @@ int q18_state(void* n, void* data){
 
     // data transfer to the successor shall be implemented here, I mean all the data shall be transferred to the successor.
 
-    Node* node = (Node*)n;
     // now we will send NET_CLOSE_CONNECTION message to the successor.
     struct NET_CLOSE_CONNECTION_PDU net_close_connection = {0};
     net_close_connection.type = NET_CLOSE_CONNECTION;
