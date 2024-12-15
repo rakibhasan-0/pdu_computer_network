@@ -133,7 +133,7 @@ int q11_state(void* n, void* data) {
 
 // state 15, where we will update the hash range dynamically and decide the response target.
 int q15_state(void* n, void* data) {
-    
+
     printf("[q15 state]\n");
     printf("We are in state 15\n");
 
@@ -195,8 +195,20 @@ int q18_state(void* n, void* data){
 
     printf("[q18 state]\n");
 
+    Node* node = (Node*)n;
+
     // as we have updated the hash range to the node's successor, I mean we have mereged the hash range.
     // here we will transfer the data to the successor.
+    bool to_successor = false;
+    if(node->hash_range_start == 0){
+        to_successor = true;
+    }
+
+    if(to_successor){
+        // data transfer to the successor shall be implemented here, I mean all the data shall be transferred to the successor.
+    }else{
+        // data transfer to the predecessor shall be implemented here, I mean all the data shall be transferred to the predecessor.
+    }
 
     // data transfer to the successor shall be implemented here, I mean all the data shall be transferred to the successor.
 
