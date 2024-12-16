@@ -73,6 +73,9 @@ struct Node {
 
     // State handler function pointer (for state transitions)
     int (*state_handler)(void*, void*);
+	
+	// Pointer to the head of the linked list of entries
+	struct Entry* entries_head;
 };
 
 // Function pointer for state handlers
