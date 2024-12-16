@@ -2,7 +2,7 @@
 CC = gcc
 CFLAGS = -g
 # Source files and object files
-SRCS = node.c initialization.c controller.c join_network.c utils.c communication.c signal_handler.c
+SRCS = node.c initialization.c controller.c join_network.c utils.c communication.c signal_handler.c clientCommunication.c
 OBJS = $(SRCS:.c=.o)
 
 # Main target
