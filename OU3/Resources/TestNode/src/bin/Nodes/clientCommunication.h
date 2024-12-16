@@ -6,7 +6,8 @@
 #include <netinet/in.h>
 
 #include "node.h"
-#include "hashtable.h"
+
+typedef struct Node Node;
 
 struct Entry {
     char ssn[12]; 
