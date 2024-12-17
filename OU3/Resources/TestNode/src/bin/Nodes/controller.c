@@ -166,6 +166,11 @@ int q6_state(void* n, void* data){
                         node->state_handler(node, buffer);
                     }
 
+                    if(message_type == VAL_INSERT || message_type == VAL_REMOVE || message_type == VAL_LOOKUP){
+                        node->state_handler = state_handlers[STATE_9];
+                        node->state_handler(node, buffer);
+                    }
+
                 }
 
 

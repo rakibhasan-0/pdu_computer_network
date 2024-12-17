@@ -42,6 +42,7 @@ int q10_state(void* n, void* data) {
         printf("I am the only node in the network. Exiting...\n");
         close_connection(node);
         printf("I am Exiting.\n");
+        // we may need deallocate everything here.
         exit(0);      
     }
   
