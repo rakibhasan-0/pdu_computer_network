@@ -24,6 +24,23 @@ typedef struct ht ht;
 typedef struct entry entry;
 typedef void (*free_function)();
 
+// key value set. 
+typedef struct node {
+    char *key;
+    void *value;
+    struct node *next; // pointer to next node in the chain.
+} node_t;
+
+struct ht {
+    node_t **entries;   // buckets.
+    int num_entries;    // number of buckets containing data in hash table.
+    size_t length;      // number of items in hash table, including each node in the buckets.
+    free_function value_free_function; // a function that is called when a nodes
+                                            //value is to be freed
+};
+
+
+
 #define MAX_SIZE 256
 #define KEY_LEN 12
 #define hash_t uint8_t
