@@ -220,34 +220,14 @@ static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu) {
         // we will forward the pdu to the successor.
         printf("Forwarding VAL_INSERT to successor\n");
         size_t pdu_size = 1 + SSN_LENGTH + 1 + pdu->name_length + 1 + pdu->email_length;
-        uint8_t* out_buffer = malloc(pdu_size);
-        if (!out_buffer) {
-            perror("Memory allocation failed for PDU buffer");
-            return;
-        }
-
-        
-        size_t offset = 0;
-        out_buffer[offset++] = pdu->type;
-        memcpy(out_buffer + offset, pdu->ssn, SSN_LENGTH);
-        offset += SSN_LENGTH;
-
-        out_buffer[offset++] = pdu->name_length;
-        memcpy(out_buffer + offset, pdu->name, pdu->name_length);
-        offset += pdu->name_length;
-
-        out_buffer[offset++] = pdu->email_length;
-        memcpy(out_buffer + offset, pdu->email, pdu->email_length);
-        offset += pdu->email_length;
-
+        uint8_t* out_buffer = constructing_insert_pdu(pdu, pdu_size);
         int send_status = send(node->sockfd_b, out_buffer, pdu_size, 0);
-        if(send_status == -1){
+        if (send_status == -1) {
             perror("send failure");
             return;
         }
 
         free(out_buffer);
-
         printf("VAL_INSERT forwarded to successor\n");
     }
 }
@@ -289,7 +269,7 @@ static bool parse_val_insert_pdu(const uint8_t* buffer, struct VAL_INSERT_PDU* p
         free(pdu_out->name);
         return false;
     }
-    
+
     memcpy(pdu_out->name, buffer + offset, pdu_out->name_length);
     offset += pdu_out->name_length;
 
