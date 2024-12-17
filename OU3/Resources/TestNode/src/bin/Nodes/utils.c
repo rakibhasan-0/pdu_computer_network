@@ -120,7 +120,74 @@ void transfer_upper_half(void* node, uint8_t range_start, uint8_t range_end){
 
     }   
 
+}
 
+// that function will be called from the state 18.
+// we will transfer all the entries to the successor or the predecessor.
+void transfer_all_entries(void* n, bool to_successor){
+
+    Node* noed = (Node*)n;
+    printf("[transfer_all_entries]\n");
+
+    // get the existing entries from the hash table.
+    // I will think about it, whether we need to use dynamic memory allocation or not for the entries.
+    char* entries_to_transfer[1024];
+    int entries_count = 0;
+
+
+    // we are iterating over the hash table to get all the entries.
+    // and save them in the entries_to_transfer array based on the ssns.
+    for(int i = 0; i < MAX_SIZE; i++){
+        node_t* current_entry = noed->hash_table->entries[i];
+        while(current_entry != NULL){
+            Entry* entry = (Entry*)current_entry->value;
+            entries_to_transfer[entries_count++] = entry->ssn;
+            current_entry = current_entry->next; // since it is chained hash table.
+        }
+    }
+
+
+    for(int i = 0; i < entries_count; i++){
+        char* ssn = entries_to_transfer[i];
+        Entry* entry = (Entry*)ht_lookup(noed->hash_table, ssn);
+        // use length to print
+        printf("The values value with SSN: %.*s\n", SSN_LENGTH, entry->ssn);
+        printf("Name: %.*s\n", (int)entry->name_length, entry->name);
+        printf("Email: %.*s\n", (int)entry->email_length, entry->email);
+        
+        struct VAL_INSERT_PDU val_insert = {0};
+        val_insert.type = VAL_INSERT;
+        memcpy(val_insert.ssn, entry->ssn, SSN_LENGTH);
+        val_insert.name_length = entry->name_length;
+        val_insert.name = entry->name;
+        val_insert.email_length = entry->email_length;
+        val_insert.email = entry->email;
+
+        size_t pdu_size = 1 + SSN_LENGTH + 1 + entry->name_length + 1 + entry->email_length;
+
+        uint8_t* out_buffer = constructing_insert_pdu(&val_insert, pdu_size);
+        int send_status;
+        if(to_successor){
+            send_status = send(noed->sockfd_b, out_buffer,pdu_size, 0);
+        }
+        else {
+            send_status = send(noed->sockfd_d, out_buffer,pdu_size, 0);
+        }
+        if (send_status == -1) {
+            perror("send failure");
+        } else {
+            printf("VAL_INSERT forwarded to successor\n");
+        }
+
+        ht_remove(noed->hash_table, ssn);
+
+        free(out_buffer);
+        free(entry->ssn);
+        free(entry->name);
+        free(entry->email);
+        free(entry);
+
+    }
 
 
 }
