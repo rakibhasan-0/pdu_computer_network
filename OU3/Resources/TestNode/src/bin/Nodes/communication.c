@@ -268,6 +268,9 @@ int q13_state(void* n, void* data){
     printf("Updated successor is %s: %d\n", inet_ntoa(node->successor_ip_address), node->successor_port);
     printf("The successor's hash range start: %d, end: %d\n", successor_start, successor_end);
 
+    // we are about to transfer upper half of the hash range to the successor.
+    transfer_upper_half(node, successor_start, successor_end);
+    
     // Move to the next state (q6)
     node->state_handler = state_handlers[STATE_6];
     node->state_handler(node, NULL);
