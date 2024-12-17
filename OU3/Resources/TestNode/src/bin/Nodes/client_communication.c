@@ -166,29 +166,24 @@ void handle_val_lookup(Node* node, struct VAL_LOOKUP_PDU* pdu) {
 static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu) {
     uint8_t hash_value = hash_ssn(pdu->ssn);
 
-    printf("Hash value: %d\n", hash_value);
     if (hash_value >= node->hash_range_start && hash_value <= node->hash_range_end) {
-        printf("Inserting value with SSN: %.12s\n", pdu->ssn);
-
-        Entry* entry = (Entry*)malloc(sizeof(Entry));
+        Entry* entry = malloc(sizeof(Entry));
         if (!entry) {
-            perror("Memory allocation failed for Entry");
+            perror("malloc failed for Entry");
             return;
         }
 
-        // Copy SSN directly (assuming SSN_LENGTH is fixed and known)
         entry->ssn = malloc(SSN_LENGTH);
         if (!entry->ssn) {
-            perror("Memory allocation failed for SSN");
+            perror("malloc failed for ssn");
             free(entry);
             return;
         }
         memcpy(entry->ssn, pdu->ssn, SSN_LENGTH);
 
-        // Copy name
         entry->name = malloc(pdu->name_length);
         if (!entry->name) {
-            perror("Memory allocation failed for name");
+            perror("malloc failed for name");
             free(entry->ssn);
             free(entry);
             return;
@@ -196,10 +191,9 @@ static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu) {
         memcpy(entry->name, pdu->name, pdu->name_length);
         entry->name_length = pdu->name_length;
 
-        // Copy email
         entry->email = malloc(pdu->email_length);
         if (!entry->email) {
-            perror("Memory allocation failed for email");
+            perror("malloc failed for email");
             free(entry->name);
             free(entry->ssn);
             free(entry);
@@ -208,27 +202,24 @@ static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu) {
         memcpy(entry->email, pdu->email, pdu->email_length);
         entry->email_length = pdu->email_length;
 
-        printf("the entry_ssn is: %.*s\n", (int)SSN_LENGTH, entry->ssn);
-        printf("the entry_name is: %.*s\n", (int)entry->name_length, entry->name);
-        printf("the entry_email is: %.*s\n", (int)entry->email_length, entry->email);
+        // Use %.*s for printing without null terminators
+        printf("Inserting value with SSN: %.*s\n", SSN_LENGTH, entry->ssn);
+        printf("Name: %.*s\n", (int)entry->name_length, entry->name);
+        printf("Email: %.*s\n", (int)entry->email_length, entry->email);
 
-        printf("we are about to insert the value\n");
         node->hash_table = ht_insert(node->hash_table, entry->ssn, entry);
         printf("Value inserted successfully\n");
     } else {
-
-        // we will forward the pdu to the successor.
-        printf("Forwarding VAL_INSERT to successor\n");
+        // Forward to successor
         size_t pdu_size = 1 + SSN_LENGTH + 1 + pdu->name_length + 1 + pdu->email_length;
         uint8_t* out_buffer = constructing_insert_pdu(pdu, pdu_size);
         int send_status = send(node->sockfd_b, out_buffer, pdu_size, 0);
         if (send_status == -1) {
             perror("send failure");
-            return;
+        } else {
+            printf("VAL_INSERT forwarded to successor\n");
         }
-
         free(out_buffer);
-        printf("VAL_INSERT forwarded to successor\n");
     }
 }
 
@@ -238,64 +229,34 @@ static bool parse_val_insert_pdu(const uint8_t* buffer, struct VAL_INSERT_PDU* p
 
     printf("Parsing PDU...\n");
 
-    // Type (1 byte)
     pdu_out->type = buffer[offset++];
-    printf("Type: %d (offset: %zu)\n", pdu_out->type, offset);
-
-    // SSN (12 bytes)
     memcpy(pdu_out->ssn, buffer + offset, SSN_LENGTH);
     offset += SSN_LENGTH;
 
-    // Print SSN for debugging
-    {
-        char ssn_str[SSN_LENGTH + 1];
-        memcpy(ssn_str, pdu_out->ssn, SSN_LENGTH);
-        ssn_str[SSN_LENGTH] = '\0';
-        printf("SSN: %s (offset: %zu)\n", ssn_str, offset);
-    }
-
-    // Name Length (1 byte)
     pdu_out->name_length = buffer[offset++];
-    if (pdu_out->name_length > MAX_NAME_LENGTH) {
-        printf("Name length is too long\n");
-        return false;
-    }
-    printf("Name Length: %d (offset: %zu)\n", pdu_out->name_length, offset);
-
-    // Name (exact name_length bytes, no null terminator)
     pdu_out->name = malloc(pdu_out->name_length);
-    if(pdu_out->email_length > MAX_EMAIL_LENGTH){
-        printf("Email length is too long\n");
-        free(pdu_out->name);
+    if (!pdu_out->name) {
+        perror("malloc failed for name");
         return false;
     }
-
     memcpy(pdu_out->name, buffer + offset, pdu_out->name_length);
     offset += pdu_out->name_length;
 
-    // For debugging, print with a length specifier
-    printf("Name: %.*s (offset: %zu)\n", pdu_out->name_length, pdu_out->name, offset);
-
-    // Email Length (1 byte)
     pdu_out->email_length = buffer[offset++];
-    if (pdu_out->email_length > MAX_EMAIL_LENGTH) {
-        printf("Email length is too long\n");
-        free(pdu_out->name);
-        return false;
-    }
-    printf("Email Length: %d (offset: %zu)\n", pdu_out->email_length, offset);
-
-    // Email (exact email_length bytes, no null terminator)
     pdu_out->email = malloc(pdu_out->email_length);
     if (!pdu_out->email) {
-        perror("Memory allocation failed for email");
+        perror("malloc failed for email");
         free(pdu_out->name);
         return false;
     }
     memcpy(pdu_out->email, buffer + offset, pdu_out->email_length);
     offset += pdu_out->email_length;
 
-    printf("Email: %.*s (offset: %zu)\n", pdu_out->email_length, pdu_out->email, offset);
+    // Print using length specifiers
+    printf("Type: %d\n", pdu_out->type);
+    printf("SSN: %.*s\n", SSN_LENGTH, pdu_out->ssn); // or treat as raw data if SSN is not guaranteed ASCII
+    printf("Name: %.*s\n", pdu_out->name_length, pdu_out->name);
+    printf("Email: %.*s\n", pdu_out->email_length, pdu_out->email);
 
     return true;
 }
