@@ -284,10 +284,12 @@ static bool parse_val_insert_pdu(const uint8_t* buffer, struct VAL_INSERT_PDU* p
 
     // Name (exact name_length bytes, no null terminator)
     pdu_out->name = malloc(pdu_out->name_length);
-    if (!pdu_out->name) {
-        perror("Memory allocation failed for name");
+    if(pdu_out->email_length > MAX_EMAIL_LENGTH){
+        printf("Email length is too long\n");
+        free(pdu_out->name);
         return false;
     }
+    
     memcpy(pdu_out->name, buffer + offset, pdu_out->name_length);
     offset += pdu_out->name_length;
 
