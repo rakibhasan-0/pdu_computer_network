@@ -127,6 +127,9 @@ int q5_state(void* n, void* data) {
         return 1;
     }
 
+    // Transfer the upper half of the hash range to the successor
+    transfer_upper_half(node, successor_start, successor_end);
+
     //node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
     struct sockaddr_in predecessor_addr = {0};
     socklen_t addr_len = sizeof(predecessor_addr);
