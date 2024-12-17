@@ -1,8 +1,10 @@
 # Compiler and flags
 CC = gcc
 CFLAGS = -g
+
 # Source files and object files
-SRCS = node.c initialization.c controller.c join_network.c utils.c communication.c signal_handler.c clientCommunication.c
+SRCS = node.c initialization.c controller.c join_network.c utils.c communication.c signal_handler.c client_communication.c \
+		hashtable.c hash.c
 OBJS = $(SRCS:.c=.o)
 
 # Main target

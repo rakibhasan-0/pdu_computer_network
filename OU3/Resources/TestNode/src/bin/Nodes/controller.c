@@ -43,6 +43,7 @@ int q6_state(void* n, void* data){
             timeout = 7;
         }
 
+       // printf("the node have %d entries", ht_get_entry_count(node->hash_table));
         int poll_status = poll(poll_fd, 4, 100);
 
         if (poll_status == -1 && errno != EINTR) {
@@ -76,7 +77,10 @@ int q6_state(void* n, void* data){
 					}
 
 					uint8_t pdu_type = buffer[0]; // the first byte indicates the PDU type
-					switch (pdu_type) {
+                    printf("the pdu type is: %d\n", pdu_type);
+                    printf("the size of the buffer is: %d\n", sizeof(buffer));
+                    printf("the size of the net_join is: %d\n", sizeof(struct NET_JOIN_PDU));
+					/*switch (pdu_type) {
 						case VAL_INSERT:
 						case VAL_REMOVE:
 						case VAL_LOOKUP:
@@ -86,33 +90,38 @@ int q6_state(void* n, void* data){
 						default:
 							printf("Unknown PDU type: %d\n", pdu_type);
 							break;	
-					}
-                    struct NET_JOIN_PDU net_join = {0};
+					}*/
 
-                    int rcv_data = recvfrom(node->sockfd_a, &net_join, sizeof(net_join), 0, (struct sockaddr *)&sender_addr, &sender_addr_len);
-                    if (rcv_data == -1) {
-                        perror("recvfrom failed");
-                        continue;
+                    // just wondering, we will check the pdu type send it to the state 9?
+                    if(pdu_type == VAL_INSERT || pdu_type == VAL_REMOVE || pdu_type == VAL_LOOKUP){
+                        node->state_handler = state_handlers[STATE_9];
+                        node->state_handler(node, buffer);
                     }
 
-                    // convert the fields to the host order.
-                    printf("Received NET_JOIN (Q6) via UDP\n");
-                    net_join.src_address = net_join.src_address;
-                    net_join.src_port = ntohs(net_join.src_port);
-                    net_join.max_address = net_join.max_address;
-                    net_join.max_port = ntohs(net_join.max_port);
-                    net_join.max_span = net_join.max_span;
+                    if(pdu_type == NET_JOIN){
+                        
+                        struct NET_JOIN_PDU net_join = (*(struct NET_JOIN_PDU*)buffer);
 
-                    //printf("Received NET_JOIN (Q6)\n");
-                    //printf("Type (Q6): %d\n", net_join.type);
-                    printf("Source Address(Q6): %s\n", inet_ntoa((struct in_addr){.s_addr = net_join.src_address}));
-                    printf("Source Port(Q6): %d\n", net_join.src_port);
-                    //printf("Max address(Q6): %s\n", inet_ntoa((struct in_addr){.s_addr = net_join.max_address}));
-                    //printf("Max Port(Q6): %d\n", net_join.max_port);
-                    //printf("we are abour to move to the q12 state from q6\n");
-                    node->state_handler = state_handlers[STATE_12];
-                    node->state_handler(node, &net_join);
-                    return 0;
+                        // convert the fields to the host order.
+                        printf("Received NET_JOIN (Q6) via UDP\n");
+                        net_join.src_address = net_join.src_address;
+                        net_join.src_port = ntohs(net_join.src_port);
+                        net_join.max_address = net_join.max_address;
+                        net_join.max_port = ntohs(net_join.max_port);
+                        net_join.max_span = net_join.max_span;
+
+                        //printf("Received NET_JOIN (Q6)\n");
+                        //printf("Type (Q6): %d\n", net_join.type);
+                        printf("Source Address(Q6): %s\n", inet_ntoa((struct in_addr){.s_addr = net_join.src_address}));
+                        printf("Source Port(Q6): %d\n", net_join.src_port);
+                        //printf("Max address(Q6): %s\n", inet_ntoa((struct in_addr){.s_addr = net_join.max_address}));
+                        //printf("Max Port(Q6): %d\n", net_join.max_port);
+                        //printf("we are abour to move to the q12 state from q6\n");
+                        node->state_handler = state_handlers[STATE_12];
+                        node->state_handler(node, &net_join);
+
+                    }
+
 
                 }else if(poll_fd[i].fd == node->listener_socket){
 
@@ -156,7 +165,6 @@ int q6_state(void* n, void* data){
                         node->state_handler = state_handlers[STATE_15];
                         node->state_handler(node, buffer);
                     }
-
 
                 }
 
@@ -216,6 +224,11 @@ int q6_state(void* n, void* data){
                         printf("we are sending data to the STATE 15\n");
                         // we are moving to the state 15.
                         node->state_handler = state_handlers[STATE_15];
+                        node->state_handler(node, buffer);
+                    }
+
+                    else if(message_type == VAL_INSERT || message_type == VAL_REMOVE || message_type == VAL_LOOKUP){
+                        node->state_handler = state_handlers[STATE_9];
                         node->state_handler(node, buffer);
                     }
                 }

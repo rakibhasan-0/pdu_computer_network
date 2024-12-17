@@ -26,6 +26,9 @@
 #include "communication.h"
 #include "signal_handler.h"
 #include "utils.h"
+#include "client_communication.h"
+#include "hashtable.h"
+#include "hash.h"
 
 #define STATE_13 9
 #define STATE_14 10
@@ -75,7 +78,10 @@ struct Node {
     int (*state_handler)(void*, void*);
 	
 	// Pointer to the head of the linked list of entries
-	struct Entry* entries_head;
+	//struct Entry* entries_head;
+
+    // poiner to the hash table
+    struct ht* hash_table;
 };
 
 // Function pointer for state handlers

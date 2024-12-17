@@ -48,6 +48,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    node->hash_table = ht_create(NULL); // we are creating the hash table.
     register_signal_handlers(); // we are about to register the signal handlers.
 
     memset(&hints, 0, sizeof(hints));
