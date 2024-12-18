@@ -146,7 +146,8 @@ void transfer_all_entries(void* n, bool to_successor){
         }
     }
 
-
+    printf("Transferring %d entries to the successor\n", entries_count);
+    
     for(int i = 0; i < entries_count; i++){
         char* ssn = entries_to_transfer[i];
         Entry* entry = (Entry*)ht_lookup(noed->hash_table, ssn);
