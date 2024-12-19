@@ -125,26 +125,10 @@ int q6_state(void* n, void* data){
                         
                     }
 
-                }else if(poll_fd[i].fd == node->listener_socket){
-                    printf("hey, I am TCP listening socket\n");
-                    struct sockaddr_in sender_addr;
-                    socklen_t sender_addr_len = sizeof(sender_addr);
-
-                    int accept_status = accept(node->listener_socket, (struct sockaddr*)&sender_addr, &sender_addr_len);
-                    char buffer[1024];
-                    int recv_status = recv(accept_status, buffer , sizeof(buffer), 0);
-                    if (recv_status == -1){
-                        perror("recv failed");
-                        return 1;
-                    }
-
-                    //close(accept_status);
-                    //close(node->listener_socket);            
-                
                 }
+
                 else if(poll_fd[i].fd == node->sockfd_b){
                  
-
                     while(1){
 
                         char buffer[1024];
@@ -152,42 +136,48 @@ int q6_state(void* n, void* data){
 
                         int recv_status = recv(node->sockfd_b, buffer, sizeof(buffer),MSG_DONTWAIT);
 
-                        if (recv_status == -1) {    
-                            if(errno == EAGAIN || errno == EWOULDBLOCK){
-                                break;
+                        if(recv_status > 0){
+
+                            uint8_t pdu_type = buffer[0];
+
+                            if(pdu_type == NET_LEAVING){
+                                node->state_handler = state_handlers[STATE_16];
+                                node->state_handler(node, buffer);
+                            }
+
+                            if(pdu_type == NET_NEW_RANGE){
+                                node->state_handler = state_handlers[STATE_15];
+                                node->state_handler(node, buffer);
+                            }
+
+                            if(pdu_type == VAL_INSERT || pdu_type == VAL_REMOVE || pdu_type == VAL_LOOKUP){
+                                void *received_data = malloc(recv_status);
+                                if(!received_data){
+                                    perror("memory allocation failed");
+                                }
+                                memcpy(received_data, buffer, recv_status);
+                                queue_enqueue(q, received_data);
                             }
                         }
 
-                        if(recv_status == 0){
+                        else if(recv_status == 0){
                             break;
                         }
 
-                        uint8_t pdu_type = buffer[0];
+                        else if(recv_status == -1){
 
-                        if(pdu_type == NET_LEAVING){
-                            node->state_handler = state_handlers[STATE_16];
-                            node->state_handler(node, buffer);
-                            break;
-                        }
-
-                        if(pdu_type == NET_NEW_RANGE){
-                            node->state_handler = state_handlers[STATE_15];
-                            node->state_handler(node, buffer);
-                            break;
-                        }
-
-                        if(pdu_type == VAL_INSERT || pdu_type == VAL_REMOVE || pdu_type == VAL_LOOKUP){
-                            total_received_messages++;
-                            node->state_handler = state_handlers[STATE_9];
-                            node->state_handler(node, buffer);
-                            //queue_enqueue(q, buffer);
-                            break;
+                            if(errno == EAGAIN || errno == EWOULDBLOCK){
+                                node->state_handler = state_handlers[STATE_9];
+                                node->state_handler(node, q);
+                            }
+                            else{
+                                perror("recv failed");
+                                return 1;
+                            }
 
                         }
 
                     }
-
-                    // I wondering do I need to care about the queue's memory allocation here or state_9 will take care of it?
                     
                 }
 
@@ -202,56 +192,62 @@ int q6_state(void* n, void* data){
                         // Receive the raw data
                         int recv_status = recv(node->sockfd_d, buffer, sizeof(buffer), MSG_DONTWAIT);
 
-                        if(recv_status == -1){
+                        if(recv_status > 0){
+                            
+                            // Extract the message type from the buffer
+                            uint8_t pdu_type = buffer[0];
+
+                            if (pdu_type == NET_JOIN) {
+                                // Validate that the full NET_JOIN_PDU was received
+                                if (recv_status >= sizeof(struct NET_JOIN_PDU)) {
+                                    struct NET_JOIN_PDU *net_join = (struct NET_JOIN_PDU *)buffer;
+                                    // we will convert the fields to the host order.
+                                    net_join->src_address = net_join->src_address;
+                                    net_join->src_port = ntohs(net_join->src_port);
+                                    net_join->max_address = net_join->max_address;
+                                    net_join->max_port = ntohs(net_join->max_port);
+                                    net_join->max_span = net_join->max_span;
+
+                                    node->state_handler = state_handlers[STATE_12];
+                                    node->state_handler(node, net_join);
+                                }
+                            } else if (pdu_type == NET_CLOSE_CONNECTION) {
+                                if (recv_status >= sizeof(struct NET_CLOSE_CONNECTION_PDU)) {
+                                    struct NET_CLOSE_CONNECTION_PDU *net_close = (struct NET_CLOSE_CONNECTION_PDU *)buffer;
+                                    node->state_handler = state_handlers[STATE_17];
+                                    node->state_handler(node, net_close);
+                                }
+                            }
+
+                            else if(pdu_type == NET_NEW_RANGE){
+                                node->state_handler = state_handlers[STATE_15];
+                                node->state_handler(node, buffer);
+                            }
+
+                            else if(pdu_type == VAL_INSERT || pdu_type == VAL_REMOVE || pdu_type == VAL_LOOKUP){
+                                void *received_data = malloc(recv_status);
+                                if(!received_data){
+                                    perror("memory allocation failed");
+                                }
+                                memcpy(received_data, buffer, recv_status);
+                                queue_enqueue(q, received_data);
+                            }
+
+                        }
+                        else if(recv_status == 0){
+                            break;
+                        }
+                        else if(recv_status == -1){
                             if(errno == EAGAIN || errno == EWOULDBLOCK){
-                                break;
+                                node->state_handler = state_handlers[STATE_9];
+                                node->state_handler(node, q);
+                            }
+                            else{
+                                perror("recv failed");
+                                return 1;
                             }
                         }
-
-                        if (recv_status == 0) {
-                            break;
-                        }
-
-                        // Extract the message type from the buffer
-                        uint8_t pdu_type = buffer[0];
-
-                        if (pdu_type == NET_JOIN) {
-                            // Validate that the full NET_JOIN_PDU was received
-                            if (recv_status >= sizeof(struct NET_JOIN_PDU)) {
-                                struct NET_JOIN_PDU *net_join = (struct NET_JOIN_PDU *)buffer;
-                                // we will convert the fields to the host order.
-                                net_join->src_address = net_join->src_address;
-                                net_join->src_port = ntohs(net_join->src_port);
-                                net_join->max_address = net_join->max_address;
-                                net_join->max_port = ntohs(net_join->max_port);
-                                net_join->max_span = net_join->max_span;
-
-                                node->state_handler = state_handlers[STATE_12];
-                                node->state_handler(node, net_join);
-                                break;
-                            }
-                        } else if (pdu_type == NET_CLOSE_CONNECTION) {
-                            if (recv_status >= sizeof(struct NET_CLOSE_CONNECTION_PDU)) {
-                                struct NET_CLOSE_CONNECTION_PDU *net_close = (struct NET_CLOSE_CONNECTION_PDU *)buffer;
-                                node->state_handler = state_handlers[STATE_17];
-                                node->state_handler(node, net_close);
-                                break;
-                            }
-                        }
-
-                        else if(pdu_type == NET_NEW_RANGE){
-                            node->state_handler = state_handlers[STATE_15];
-                            node->state_handler(node, buffer);
-                            break;
-                        }
-
-                        else if(pdu_type == VAL_INSERT || pdu_type == VAL_REMOVE || pdu_type == VAL_LOOKUP){
-                            total_received_messages++;
-                            node->state_handler = state_handlers[STATE_9];
-                            node->state_handler(node, buffer);
-                            //queue_enqueue(q, buffer);
-                            break;
-                        }
+                        
                     }
 
                 }        
