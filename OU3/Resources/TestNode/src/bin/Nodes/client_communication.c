@@ -39,7 +39,7 @@ int q9_state(void* n, void* data) {
     // now we will transfer data into the queue as we have inserted data into the queue in the state 6.
     
     queue_t* q = (queue_t*)data;
-    printf("The size of the queue is %d\n", q->size);
+    //printf("The size of the queue is %d\n", q->size);
     
     // we will dequeue the data from the queue.
     while(!queue_is_empty(q)){
@@ -143,9 +143,9 @@ static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu) {
         memcpy(entry->email, pdu->email, pdu->email_length);
         entry->email_length = pdu->email_length;
 
-        //printf("the entry_ssn is: %.*s\n", (int)SSN_LENGTH, entry->ssn);
-        //printf("the entry_name is: %.*s\n", (int)entry->name_length, entry->name);
-        //printf("the entry_email is: %.*s\n", (int)entry->email_length, entry->email);
+        printf("the entry_ssn is: %.*s\n", (int)SSN_LENGTH, entry->ssn);
+        printf("the entry_name is: %.*s\n", (int)entry->name_length, entry->name);
+        printf("the entry_email is: %.*s\n", (int)entry->email_length, entry->email);
 
         //printf("we are about to insert the value\n");
         node->hash_table = ht_insert(node->hash_table, entry->ssn, entry);
