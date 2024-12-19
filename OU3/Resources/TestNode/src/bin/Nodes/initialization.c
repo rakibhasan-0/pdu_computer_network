@@ -16,6 +16,7 @@ int q1_state(void* n, void* data) {
         perror("socket failure");
         return 1;
     }
+    
 
     // we are craeting a socket for the listener
     node->listener_socket = socket(AF_INET, SOCK_STREAM, 0);
