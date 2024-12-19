@@ -43,16 +43,11 @@ int q9_state(void* n, void* data) {
     switch (pdu_type) {
 
         case VAL_INSERT:
-            printf("Handling VAL_INSERT\n");
             struct VAL_INSERT_PDU pdu = {0};
 
             // Parse the buffer into the PDU structure of the VAL_INSERT_PDU type
             if(parse_val_insert_pdu(buffer, &pdu)){
-                printf("SSN: %s\n", pdu.ssn);
-                printf("Name: %s\n", pdu.name);
-                printf("Email: %s\n", pdu.email);
                 insertion_of_value(node, &pdu);
-                // Free allocated memory
                 free(pdu.name);
                 free(pdu.email);
             }

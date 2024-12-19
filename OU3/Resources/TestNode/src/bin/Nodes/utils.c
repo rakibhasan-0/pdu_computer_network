@@ -10,9 +10,6 @@ void update_hash_range(void* n, uint8_t new_range_start, uint8_t new_range_end) 
     //printf("Current hash range: [%d, %d)\n", node->hash_range_start, node->hash_range_end);
     Node* node = (Node*)n;
 
-    printf("[update_hash_range]\n");
-    printf("Current range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
-    printf("Updating range to: (%d, %d)\n", new_range_start, new_range_end);
 
     // Validate the new range to ensure it's consistent with DHT logic
     if (new_range_start < 0 || new_range_end > 255 || new_range_start > new_range_end) {
@@ -88,9 +85,9 @@ void transfer_upper_half(void* node, uint8_t range_start, uint8_t range_end){
         char* ssn = entries_to_transfer[i];
         Entry* entry = (Entry*)ht_lookup(n->hash_table, ssn);
         // use length to print
-        printf("The values value with SSN: %.*s\n", SSN_LENGTH, entry->ssn);
-        printf("Name: %.*s\n", (int)entry->name_length, entry->name);
-        printf("Email: %.*s\n", (int)entry->email_length, entry->email);
+        //printf("The values value with SSN: %.*s\n", SSN_LENGTH, entry->ssn);
+        //printf("Name: %.*s\n", (int)entry->name_length, entry->name);
+        //printf("Email: %.*s\n", (int)entry->email_length, entry->email);
         
         struct VAL_INSERT_PDU val_insert = {0};
         val_insert.type = VAL_INSERT;
@@ -117,6 +114,7 @@ void transfer_upper_half(void* node, uint8_t range_start, uint8_t range_end){
         free(entry->name);
         free(entry->email);
         free(entry);
+        sleep(1);
 
     }   
 
@@ -147,7 +145,7 @@ void transfer_all_entries(void* n, bool to_successor){
     }
 
     printf("Transferring %d entries to the successor\n", entries_count);
-    
+
     for(int i = 0; i < entries_count; i++){
         char* ssn = entries_to_transfer[i];
         Entry* entry = (Entry*)ht_lookup(noed->hash_table, ssn);
@@ -187,6 +185,7 @@ void transfer_all_entries(void* n, bool to_successor){
         free(entry->name);
         free(entry->email);
         free(entry);
+        sleep(1);
 
     }
 

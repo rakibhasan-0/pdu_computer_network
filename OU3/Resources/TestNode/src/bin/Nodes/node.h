@@ -29,6 +29,7 @@
 #include "client_communication.h"
 #include "hashtable.h"
 #include "hash.h"
+#include "queue.h"
 
 #define STATE_13 9
 #define STATE_14 10

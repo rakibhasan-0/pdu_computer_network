@@ -18,6 +18,8 @@ int q6_state(void* n, void* data){
     net_alive.type = NET_ALIVE;
    
     node->is_alive = true;
+    queue_t *q = queue_create(10);
+    int total_received_messages = 0;
     
     // time interval for the alive message
     int timeout = 1;
@@ -35,7 +37,7 @@ int q6_state(void* n, void* data){
 
     while(1){
         time_t current_time = time(NULL);
-        
+    
 
         if (current_time - last_time >= timeout){
             printf("The number of entries in the hash table is %d\n", get_num_entries(node->hash_table));
@@ -63,8 +65,6 @@ int q6_state(void* n, void* data){
         for(int i = 0; i < 4; i++){
 
             if(poll_fd[i].revents == POLLIN){
-                // clearning the revents
-                poll_fd[i].revents = 0;
 
                 if(poll_fd[i].fd == node->sockfd_a){
 
@@ -75,39 +75,43 @@ int q6_state(void* n, void* data){
 				        struct sockaddr_in sender_addr;
 				        socklen_t sender_addr_len = sizeof(sender_addr);
                         // we will continue to receive the data until there is no data to receive.
-                        int recv_status = recvfrom(node->sockfd_a, buffer, sizeof(buffer),0, (struct sockaddr*)&sender_addr,
+                        int recv_status = recvfrom(node->sockfd_a, buffer, sizeof(buffer),MSG_DONTWAIT, (struct sockaddr*)&sender_addr,
                                                 &sender_addr_len);
                 
-                        if (recv_status == -1) {
-                            if(errno == EAGAIN || errno == EWOULDBLOCK){
-                                break;
+                        if(recv_status > 0){
+
+                            uint8_t pdu_type =  *(uint8_t *)buffer;
+                            if(pdu_type == VAL_INSERT || pdu_type == VAL_REMOVE || pdu_type == VAL_LOOKUP){
+                                total_received_messages++;
+                                queue_enqueue(q, buffer);
                             }
+
+                            else if(pdu_type == NET_JOIN){                       
+                                struct NET_JOIN_PDU net_join = (*(struct NET_JOIN_PDU*)buffer);
+                                net_join.src_address = net_join.src_address;
+                                net_join.src_port = ntohs(net_join.src_port);
+                                net_join.max_address = net_join.max_address;
+                                net_join.max_port = ntohs(net_join.max_port);
+                                net_join.max_span = net_join.max_span;
+                                node->state_handler = state_handlers[STATE_12];
+                                node->state_handler(node, &net_join);
+                            }
+
+                        }
+
+                        else if (recv_status == 0){
+                            break;
+                        }
+
+                        else if(errno == EAGAIN || errno == EWOULDBLOCK){
+                            if(!queue_is_empty(q)){
+                                // now we will move to the next state
+                                node->state_handler = state_handlers[STATE_9];
+                                node->state_handler(node, q);
+                            }
+                            break;
                         }
                         
-                        if(recv_status == 0){
-                            break;
-                        }
-
-                        uint8_t pdu_type = buffer[0]; 
-                        // just wondering, we will check the pdu type send it to the state 9?
-                        if(pdu_type == VAL_INSERT || pdu_type == VAL_REMOVE || pdu_type == VAL_LOOKUP){
-                            node->state_handler = state_handlers[STATE_9];
-                            node->state_handler(node, buffer);
-                            break;
-                        }
-
-                        else if(pdu_type == NET_JOIN){     
-                            printf("received NET_JOIN\n");                   
-                            struct NET_JOIN_PDU net_join = (*(struct NET_JOIN_PDU*)buffer);
-                            net_join.src_address = net_join.src_address;
-                            net_join.src_port = ntohs(net_join.src_port);
-                            net_join.max_address = net_join.max_address;
-                            net_join.max_port = ntohs(net_join.max_port);
-                            net_join.max_span = net_join.max_span;
-                            node->state_handler = state_handlers[STATE_12];
-                            node->state_handler(node, &net_join);
-                            break;
-                        }
                     }
 
                 }else if(poll_fd[i].fd == node->listener_socket){
@@ -128,13 +132,15 @@ int q6_state(void* n, void* data){
                 
                 }
                 else if(poll_fd[i].fd == node->sockfd_b){
+                 
 
                     while(1){
 
                         char buffer[1024];
                         memset(buffer, 0, sizeof(buffer));
 
-                        int recv_status = recv(node->sockfd_b, buffer, sizeof(buffer),0);
+                        int recv_status = recv(node->sockfd_b, buffer, sizeof(buffer),MSG_DONTWAIT);
+
                         if (recv_status == -1) {    
                             if(errno == EAGAIN || errno == EWOULDBLOCK){
                                 break;
@@ -160,26 +166,30 @@ int q6_state(void* n, void* data){
                         }
 
                         if(pdu_type == VAL_INSERT || pdu_type == VAL_REMOVE || pdu_type == VAL_LOOKUP){
+                            total_received_messages++;
                             node->state_handler = state_handlers[STATE_9];
                             node->state_handler(node, buffer);
+                            //queue_enqueue(q, buffer);
                             break;
+
                         }
 
                     }
+
+                    // I wondering do I need to care about the queue's memory allocation here or state_9 will take care of it?
                     
                 }
 
 
                 else if (poll_fd[i].fd == node->sockfd_d) {
 
-                    // Buffer to store the raw data received
                     while(1){
 
                         char buffer[1024] = {0};
                         memset(buffer, 0, sizeof(buffer));
 
                         // Receive the raw data
-                        int recv_status = recv(node->sockfd_d, buffer, sizeof(buffer), 0);
+                        int recv_status = recv(node->sockfd_d, buffer, sizeof(buffer), MSG_DONTWAIT);
 
                         if(recv_status == -1){
                             if(errno == EAGAIN || errno == EWOULDBLOCK){
@@ -225,12 +235,14 @@ int q6_state(void* n, void* data){
                         }
 
                         else if(pdu_type == VAL_INSERT || pdu_type == VAL_REMOVE || pdu_type == VAL_LOOKUP){
+                            total_received_messages++;
                             node->state_handler = state_handlers[STATE_9];
                             node->state_handler(node, buffer);
+                            //queue_enqueue(q, buffer);
                             break;
                         }
-
                     }
+
                 }        
             }
         }

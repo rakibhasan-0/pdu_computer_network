@@ -4,7 +4,7 @@ CFLAGS = -g
 
 # Source files and object files
 SRCS = node.c initialization.c controller.c join_network.c utils.c communication.c signal_handler.c client_communication.c \
-		hashtable.c hash.c
+		hashtable.c hash.c queue.c
 OBJS = $(SRCS:.c=.o)
 
 # Main target
