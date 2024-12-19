@@ -34,13 +34,13 @@ int q6_state(void* n, void* data){
     poll_fd[3].fd = node->sockfd_d;
     poll_fd[3].events = POLLIN;
 
-
     while(1){
         time_t current_time = time(NULL);
     
 
         if (current_time - last_time >= timeout){
-            printf("The number of entries in the hash table is %d\n", get_num_entries(node->hash_table));
+            printf("The number of entries in the hash table is %d\n", node->hash_table->length);
+            printf("The number of messages received is %d\n", total_received_messages);
             int send_status = sendto(node->sockfd_a, &net_alive, sizeof(net_alive), 0,
                                      node->tracker_addr->ai_addr, node->tracker_addr->ai_addrlen);
             last_time = current_time;
@@ -68,7 +68,7 @@ int q6_state(void* n, void* data){
 
                 if(poll_fd[i].fd == node->sockfd_a){
 
-                    while(true){
+                    while(1){
                         
                         char buffer[1024];
                         memset(buffer, 0, sizeof(buffer));
@@ -77,13 +77,22 @@ int q6_state(void* n, void* data){
                         // we will continue to receive the data until there is no data to receive.
                         int recv_status = recvfrom(node->sockfd_a, buffer, sizeof(buffer),MSG_DONTWAIT, (struct sockaddr*)&sender_addr,
                                                 &sender_addr_len);
+                        
                 
                         if(recv_status > 0){
 
-                            uint8_t pdu_type =  *(uint8_t *)buffer;
+                            uint8_t pdu_type = buffer[0];
+
                             if(pdu_type == VAL_INSERT || pdu_type == VAL_REMOVE || pdu_type == VAL_LOOKUP){
                                 total_received_messages++;
-                                queue_enqueue(q, buffer);
+                                void* received_data = malloc(recv_status);
+
+                                if(!received_data){
+                                    perror("memory allocation failed");
+                                    break;
+                                }
+                                memcpy(received_data, buffer, recv_status);
+                                queue_enqueue(q, received_data);
                             }
 
                             else if(pdu_type == NET_JOIN){                       
@@ -103,13 +112,15 @@ int q6_state(void* n, void* data){
                             break;
                         }
 
-                        else if(errno == EAGAIN || errno == EWOULDBLOCK){
-                            if(!queue_is_empty(q)){
-                                // now we will move to the next state
+                        else if(recv_status == -1){
+                            if(errno == EAGAIN || errno == EWOULDBLOCK){
                                 node->state_handler = state_handlers[STATE_9];
                                 node->state_handler(node, q);
                             }
-                            break;
+                            else{
+                                perror("recv failed");
+                                return 1;
+                            }
                         }
                         
                     }
