@@ -84,10 +84,11 @@ void transfer_upper_half(void* node, uint8_t range_start, uint8_t range_end){
 
         char* ssn = entries_to_transfer[i];
         Entry* entry = (Entry*)ht_lookup(n->hash_table, ssn);
-        // use length to print
-        //printf("The values value with SSN: %.*s\n", SSN_LENGTH, entry->ssn);
-        //printf("Name: %.*s\n", (int)entry->name_length, entry->name);
-        //printf("Email: %.*s\n", (int)entry->email_length, entry->email);
+
+        printf("{The values value with SSN: %.*s, Name: %.*s, Email: %.*s}\n",
+        (int)SSN_LENGTH, entry->ssn,
+        (int)entry->name_length, entry->name,
+        (int)entry->email_length, entry->email);
         
         struct VAL_INSERT_PDU val_insert = {0};
         val_insert.type = VAL_INSERT;
@@ -149,10 +150,11 @@ void transfer_all_entries(void* n, bool to_successor){
     for(int i = 0; i < entries_count; i++){
         char* ssn = entries_to_transfer[i];
         Entry* entry = (Entry*)ht_lookup(noed->hash_table, ssn);
-        // use length to print
-        printf("The values value with SSN: %.*s\n", SSN_LENGTH, entry->ssn);
-        printf("Name: %.*s\n", (int)entry->name_length, entry->name);
-        printf("Email: %.*s\n", (int)entry->email_length, entry->email);
+
+        printf("{The values value with SSN: %.*s, Name: %.*s, Email: %.*s}\n",
+        (int)SSN_LENGTH, entry->ssn,
+        (int)entry->name_length, entry->name,
+        (int)entry->email_length, entry->email);
         
         struct VAL_INSERT_PDU val_insert = {0};
         val_insert.type = VAL_INSERT;

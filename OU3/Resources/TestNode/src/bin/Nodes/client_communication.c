@@ -143,9 +143,11 @@ static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu) {
         memcpy(entry->email, pdu->email, pdu->email_length);
         entry->email_length = pdu->email_length;
 
-        printf("the entry_ssn is: %.*s\n", (int)SSN_LENGTH, entry->ssn);
-        printf("the entry_name is: %.*s\n", (int)entry->name_length, entry->name);
-        printf("the entry_email is: %.*s\n", (int)entry->email_length, entry->email);
+        printf("{SSN: %.*s, Name: %.*s, Email: %.*s}\n",
+        (int)SSN_LENGTH, entry->ssn,
+        (int)entry->name_length, entry->name,
+        (int)entry->email_length, entry->email);
+
 
         //printf("we are about to insert the value\n");
         node->hash_table = ht_insert(node->hash_table, entry->ssn, entry);
