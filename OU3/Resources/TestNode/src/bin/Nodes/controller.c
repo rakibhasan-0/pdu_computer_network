@@ -4,6 +4,7 @@
 
 
 // if the node is not connected after receiving sigint signal, we will close the connection.
+// we may need to fix the close connection.
 
 static void manage_pdu(Node* node, PDU* pdu){
     
