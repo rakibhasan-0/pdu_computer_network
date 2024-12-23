@@ -5,9 +5,8 @@
 
 // if the node is not connected after receiving sigint signal, we will close the connection.
 
-static void manage_pdu(Node* node, PDU* pdu, bool check_empty){
+static void manage_pdu(Node* node, PDU* pdu){
     
-
     switch(pdu->type){
         case NET_LEAVING:
             node->state_handler = state_handlers[STATE_18];
@@ -18,16 +17,13 @@ static void manage_pdu(Node* node, PDU* pdu, bool check_empty){
             node->state_handler(node, pdu);
             break;
         case VAL_INSERT:
-            node->state_handler = state_handlers[STATE_9];
-            node->state_handler(node, pdu);
+            queue_enqueue(node->queue_for_values, pdu);
             break;
         case VAL_REMOVE:
-            node->state_handler = state_handlers[STATE_9];
-            node->state_handler(node, pdu);
+            queue_enqueue(node->queue_for_values, pdu);
             break;
         case VAL_LOOKUP:
-            node->state_handler = state_handlers[STATE_9];
-            node->state_handler(node, pdu);
+            queue_enqueue(node->queue_for_values, pdu);
             break;
         case NET_JOIN:
             // we will convert the fields to the host order.
@@ -54,35 +50,12 @@ static void manage_pdu(Node* node, PDU* pdu, bool check_empty){
 
 }
 
-size_t determine_pdu_size(uint8_t pdu_type){
-    switch(pdu_type){
-        case NET_JOIN:
-            return sizeof(struct NET_JOIN_PDU);
-        case NET_ALIVE:
-            return sizeof(struct NET_ALIVE_PDU);
-        case NET_CLOSE_CONNECTION:
-            return sizeof(struct NET_CLOSE_CONNECTION_PDU);
-        case NET_NEW_RANGE:
-            return sizeof(struct NET_NEW_RANGE_PDU);
-        case NET_LEAVING:
-            return sizeof(struct NET_LEAVING_PDU);
-        case VAL_INSERT:
-            return sizeof(struct VAL_INSERT_PDU);
-        case VAL_REMOVE:
-            return sizeof(struct VAL_REMOVE_PDU);
-        case VAL_LOOKUP:
-            return sizeof(struct VAL_LOOKUP_PDU);
-        default:
-            return 0;
-    }
-}
 
 
+ssize_t get_packet_size(uint8_t pdu_type, const char *buffer, size_t buffer_fill){
 
-ssize_t get_packet_size(uint8_t pdu_type, const char *buffer, size_t buffer_fill)
-{
-    switch (pdu_type)
-    {
+    switch (pdu_type){
+
     case NET_ALIVE:
         return sizeof(struct NET_ALIVE_PDU);
 
@@ -116,16 +89,16 @@ ssize_t get_packet_size(uint8_t pdu_type, const char *buffer, size_t buffer_fill
     case VAL_LOOKUP:
         return sizeof(struct VAL_LOOKUP_PDU);
 
-    case VAL_LOOKUP_RESPONSE:
-    {
-        if (buffer_fill < 14)
-        {              // 1 (TYPE) + 12 (SSN) + 1 (NAME_LENGTH)
+    case VAL_LOOKUP_RESPONSE:{
+
+        if (buffer_fill < 14){              
+            // 1 (TYPE) + 12 (SSN) + 1 (NAME_LENGTH)
             return -1; // Insufficient data
         }
 
         uint8_t name_length = buffer[13];
-        if (buffer_fill < 14 + name_length + 1)
-        {              // +1 for EMAIL_LENGTH
+        if (buffer_fill < 14 + name_length + 1){              
+            // +1 for EMAIL_LENGTH
             return -1; // Insufficient data
         }
 
@@ -133,21 +106,22 @@ ssize_t get_packet_size(uint8_t pdu_type, const char *buffer, size_t buffer_fill
         return 1 + 12 + 1 + name_length + 1 + email_length;
     }
 
-    case VAL_INSERT:
-    {
-        if (buffer_fill < 14)
-        {              // 1 (TYPE) + 12 (SSN) + 1 (NAME_LENGTH)
+    case VAL_INSERT:{
+
+        if (buffer_fill < 14){              
+            // 1 (TYPE) + 12 (SSN) + 1 (NAME_LENGTH)
             return -1; // Insufficient data
         }
 
         uint8_t name_length = buffer[13];
-        if (buffer_fill < 14 + name_length + 1)
-        {              // +1 for EMAIL_LENGTH
+        if (buffer_fill < 14 + name_length + 1){
+            // +1 for EMAIL_LENGTH
             return -1; // Insufficient data
         }
 
         uint8_t email_length = buffer[14 + name_length];
         return 1 + 12 + 1 + name_length + 1 + email_length;
+
     }
 
     case STUN_LOOKUP:
@@ -239,7 +213,7 @@ int q6_state(void* n, void* data){
                 // udp socket
                 if(poll_fd[i].fd == node->sockfd_a){
 
-                    int bytes_recv = recvfrom(node->sockfd_a, udp_buffer, sizeof(udp_buffer), 0, NULL, NULL); 
+                    int bytes_recv = recvfrom(node->sockfd_a, udp_buffer, sizeof(udp_buffer), MSG_DONTWAIT, NULL, NULL); 
                     if(bytes_recv == -1){
                         perror("recvfrom failure");
                         return 1;
@@ -248,11 +222,15 @@ int q6_state(void* n, void* data){
                     struct PDU pdu;
                     pdu.type = udp_buffer[0];
                     pdu.data = udp_buffer;
+                    //printf("PDU type: %u\n", pdu.type);
                     memcpy(pdu.buffer, udp_buffer, bytes_recv);
-
                     manage_pdu(node, &pdu);
 
-                    
+                    if(!queue_is_empty(node->queue_for_values)){
+                        node->state_handler = state_handlers[STATE_9];
+                        node->state_handler(node, NULL);
+                    }
+
                 }
 
                 // TCP socket for the successor 
@@ -311,9 +289,13 @@ int q6_state(void* n, void* data){
 
                     while(!queue_is_empty(q)){
                         PDU* pdu = queue_dequeue(q);
-                        bool check_empty = queue_is_empty(q);
-                        manage_pdu(node, pdu, check_empty);
+                        manage_pdu(node, pdu);
                         free(pdu);
+                    }
+
+                    if(!queue_is_empty(node->queue_for_values)){
+                        node->state_handler = state_handlers[STATE_9];
+                        node->state_handler(node, NULL);
                     }
                 }
 
@@ -404,7 +386,6 @@ int q6_state(void* n, void* data){
                         pdu->type = pdu_type;
                         memcpy(pdu->buffer, predecessor_buffer + offset, pdu_size);
                         printf("PDU buffer: %.*s\n", (int)pdu_size, pdu->buffer);
-
                         queue_enqueue(q, pdu);  // or manage_pdu(node, pdu) directly
 
                         offset += pdu_size;
@@ -423,19 +404,14 @@ int q6_state(void* n, void* data){
                     while (!queue_is_empty(q)) {
                         PDU* p = queue_dequeue(q);
                         manage_pdu(node, p);
-
-                        // I think I hav understood after moving to the state 9, then we move to the state 6.
-                        printf("Queue size: %d\n", q->size);
-                        free(p);
                     }
 
+                    if (!queue_is_empty(node->queue_for_values)) {
+                        node->state_handler = state_handlers[STATE_9];
+                        node->state_handler(node, NULL);
+                    }
 
                 }
-
-
-
-
-
        
             }
         }

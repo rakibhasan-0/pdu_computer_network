@@ -34,7 +34,12 @@ void send_val_lookup_response(const struct Entry* entry, int socket_fd);
 
 int q9_state(void* n, void* data) {
     Node* node = (Node*)n;
+    queue_t* q = node->queue_for_values;
+
+
     printf("[Q9 state]\n");
+
+    
 
     // now we will transfer data into the queue as we have inserted data into the queue in the state 6.
     
@@ -44,42 +49,46 @@ int q9_state(void* n, void* data) {
     // we will dequeue the data from the queue.
     //printf("PDU type: %d\n", pdu_type);
 
-    PDU* pdu = (PDU*)data;
-    uint8_t pdu_type = pdu->type;
 
-    switch (pdu_type) {
+    while(!queue_is_empty(q)){
 
-        case VAL_INSERT:
-            struct VAL_INSERT_PDU pdu_insert = {0};
+        PDU* pdu = queue_dequeue(q);
+        uint8_t pdu_type = pdu->type;
 
-            // Parse the buffer into the PDU structure of the VAL_INSERT_PDU type
-            if(parse_val_insert_pdu(pdu->buffer, &pdu_insert)) {
-                insertion_of_value(node, &pdu_insert);
-            }
-            break;
+        switch (pdu_type) {
 
-        case VAL_REMOVE:
-            printf("Handling VAL_REMOVE\n");
-            struct VAL_REMOVE_PDU val_remove_pdu;
-           // parse_val_remove_pdu(entry_data, &val_remove_pdu);
-            printf("SSN: %s\n", val_remove_pdu.ssn);
-            remove_value(node, &val_remove_pdu);
-            remove_value(node, &val_remove_pdu);
-            break;
-        case VAL_LOOKUP: 
-            printf("Handling VAL_LOOKUP\n");
-            struct VAL_LOOKUP_PDU val_lookup_pdu;
-           // parse_val_lookup_pdu(entry_data, &val_lookup_pdu);
-            printf("SSN: %s\n", val_lookup_pdu.ssn);
-            lookup_value(node, &val_lookup_pdu);
-        
-            break;
-        default:
-            printf("Unknown PDU type: %d\n", pdu_type);
-            break;
+            case VAL_INSERT:
+                struct VAL_INSERT_PDU pdu_insert = {0};
+
+                // Parse the buffer into the PDU structure of the VAL_INSERT_PDU type
+                if(parse_val_insert_pdu(pdu->buffer, &pdu_insert)) {
+                    insertion_of_value(node, &pdu_insert);
+                }
+                break;
+
+            case VAL_REMOVE:
+                printf("Handling VAL_REMOVE\n");
+                struct VAL_REMOVE_PDU val_remove_pdu;
+            // parse_val_remove_pdu(entry_data, &val_remove_pdu);
+                printf("SSN: %s\n", val_remove_pdu.ssn);
+                remove_value(node, &val_remove_pdu);
+                remove_value(node, &val_remove_pdu);
+                break;
+            case VAL_LOOKUP: 
+                printf("Handling VAL_LOOKUP\n");
+                struct VAL_LOOKUP_PDU val_lookup_pdu;
+            // parse_val_lookup_pdu(entry_data, &val_lookup_pdu);
+                printf("SSN: %s\n", val_lookup_pdu.ssn);
+                lookup_value(node, &val_lookup_pdu);
+            
+                break;
+            default:
+                printf("Unknown PDU type: %d\n", pdu_type);
+                break;
+        }
+
     }
-
-
+    
     
     // Transition back to Q6 state after processing the PDU
     node->state_handler = state_handlers[STATE_6];
