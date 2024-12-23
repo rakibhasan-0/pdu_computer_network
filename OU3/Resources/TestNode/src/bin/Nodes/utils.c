@@ -115,7 +115,7 @@ void transfer_upper_half(void* node, uint8_t range_start, uint8_t range_end){
         free(entry->name);
         free(entry->email);
         free(entry);
-        sleep(1);
+       // sleep(1);
 
     }   
 
@@ -187,7 +187,7 @@ void transfer_all_entries(void* n, bool to_successor){
         free(entry->name);
         free(entry->email);
         free(entry);
-        sleep(1);
+       // sleep(1);
 
     }
 

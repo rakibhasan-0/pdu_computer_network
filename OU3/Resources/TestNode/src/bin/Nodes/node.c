@@ -50,6 +50,7 @@ int main(int argc, char* argv[]) {
 
     node->hash_table = ht_create(NULL); // we are creating the hash table.
     register_signal_handlers(); // we are about to register the signal handlers.
+    node->queue_for_values = queue_create(10); // we are creating the queue for the values.
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_INET;

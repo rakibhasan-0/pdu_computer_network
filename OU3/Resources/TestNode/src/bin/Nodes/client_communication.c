@@ -35,21 +35,36 @@ static void send_lookup_response(Node* node, struct VAL_LOOKUP_RESPONSE_PDU* res
 
 int q9_state(void* n, void* data) {
     Node* node = (Node*)n;
+    queue_t* q = node->queue_for_values;
+
+
     printf("[Q9 state]\n");
 
+    
+
     // now we will transfer data into the queue as we have inserted data into the queue in the state 6.
-    queue_t* q = (queue_t*)data;
+    
+    //queue_t* q = (queue_t*)data;
+    //printf("The size of the queue is %d\n", q->size);
+    
+    // we will dequeue the data from the queue.
+    //printf("PDU type: %d\n", pdu_type);
+
+
     while(!queue_is_empty(q)){
-        char* buffer = (char*)queue_dequeue(q);
-        uint8_t pdu_type = buffer[0]; // Assuming the first byte indicates the PDU type
-        printf("PDU type: %d\n", pdu_type);
+
+        PDU* pdu = queue_dequeue(q);
+        uint8_t pdu_type = pdu->type;
 
         switch (pdu_type) {
+
             case VAL_INSERT:
-                printf("Handling VAL_INSERT\n");
-                struct VAL_INSERT_PDU val_insert_pdu;
-                parse_val_insert_pdu((uint8_t*)buffer, &val_insert_pdu);
-                insertion_of_value(node, &val_insert_pdu);
+                struct VAL_INSERT_PDU pdu_insert = {0};
+
+                // Parse the buffer into the PDU structure of the VAL_INSERT_PDU type
+                if(parse_val_insert_pdu(pdu->buffer, &pdu_insert)) {
+                    insertion_of_value(node, &pdu_insert);
+                }
                 break;
             case VAL_REMOVE:
                 printf("Handling VAL_REMOVE\n");
@@ -70,7 +85,8 @@ int q9_state(void* n, void* data) {
                 break;
         }
     }
-
+    
+    
     // Transition back to Q6 state after processing the PDU
     node->state_handler = state_handlers[STATE_6];
     node->state_handler(node, NULL);
@@ -387,4 +403,3 @@ static bool parse_val_lookup_pdu(const uint8_t* buffer, struct VAL_LOOKUP_PDU* p
 
     return true;
 }
-

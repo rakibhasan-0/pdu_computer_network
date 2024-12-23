@@ -47,6 +47,15 @@
 
 typedef struct Node Node;
 
+
+struct PDU {
+    uint8_t type;
+    char* data;
+    char buffer [2048];
+};
+
+typedef struct PDU PDU;
+
 // Node structure
 struct Node {
     // Predecessor and successor details
@@ -59,6 +68,8 @@ struct Node {
     uint8_t hash_range_start;  // Range from 0 to 255
     uint8_t hash_range_end;
     uint8_t hash_span;
+
+    queue_t* queue_for_values;
 
     // Node's local details
     uint16_t port;
