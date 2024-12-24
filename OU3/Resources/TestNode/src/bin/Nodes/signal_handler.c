@@ -218,11 +218,6 @@ int q15_state(void* n, void* data) {
     // Log the updated hash range
     printf("Updated node's range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
 
-    // Move to state 6 after completing the update
-    printf("Now moving to state 6\n");
-    node->state_handler = state_handlers[STATE_6];
-    node->state_handler(node, NULL);
-
     return 0;
 }
 
@@ -361,9 +356,5 @@ int q16_state(void* n, void* data){
     }
 
     // Transition to state 6
-    printf("Now moving to state 6\n");
-    node->state_handler = state_handlers[STATE_6];
-    node->state_handler(node, NULL);
-
     return 0;
 }

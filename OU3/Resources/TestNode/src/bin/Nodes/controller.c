@@ -29,8 +29,9 @@ int q6_state(void* n, void* data){
 
     static char udp_buffer[4096];
 
-    static char successor_buffer[4096];
-    static char predecessor_buffer[4096];
+    static char successor_buffer[1024 * 1024];
+    static char predecessor_buffer[1024 * 1024];
+    static size_t udp_buffer_filled = 0;
 
     static size_t succ_buufer_filled = 0;
     static size_t pred_buffer_filled = 0;
@@ -48,12 +49,10 @@ int q6_state(void* n, void* data){
     struct pollfd poll_fd[4];
     poll_fd[0].fd = node->sockfd_a;
     poll_fd[0].events = POLLIN;
-    poll_fd[1].fd = node->listener_socket;
+    poll_fd[1].fd = node->sockfd_b;
     poll_fd[1].events = POLLIN;
-    poll_fd[2].fd = node->sockfd_b;
+    poll_fd[2].fd = node->sockfd_d;
     poll_fd[2].events = POLLIN;
-    poll_fd[3].fd = node->sockfd_d;
-    poll_fd[3].events = POLLIN;
  
 
     while(1){
@@ -74,7 +73,7 @@ int q6_state(void* n, void* data){
         }
 
        // printf("the node have %d entries", ht_get_entry_count(node->hash_table));
-        int poll_status = poll(poll_fd, 4, 1000);
+        int poll_status = poll(poll_fd, 3, 4000);
 
         if (poll_status == -1 && errno != EINTR) {
             perror("poll failed");
@@ -88,7 +87,7 @@ int q6_state(void* n, void* data){
         }
 
 
-        for(int i = 0; i < 4; i++){
+        for(int i = 0; i < 3; i++){
             
             if(poll_fd[i].revents == POLLIN){
                 
@@ -101,6 +100,8 @@ int q6_state(void* n, void* data){
                         return 1;
                     }
 
+                    udp_buffer_filled += bytes_recv;
+
                     struct PDU pdu;
                     pdu.type = udp_buffer[0];
                     pdu.data = udp_buffer;
@@ -112,6 +113,8 @@ int q6_state(void* n, void* data){
                         node->state_handler = state_handlers[STATE_9];
                         node->state_handler(node, NULL);
                     }
+
+                    printf("UDP buffer filled: %zu\n", udp_buffer_filled);
 
                 }
 
@@ -179,105 +182,85 @@ int q6_state(void* n, void* data){
                         free(pdu);
                     }
 
-                    if(!queue_is_empty(node->queue_for_values)){
-                        node->state_handler = state_handlers[STATE_9];
-                        node->state_handler(node, NULL);
-                    }
                 }
 
 
-
+        
+                // predecessor socket
                 else if (poll_fd[i].fd == node->sockfd_d) {
                     bool close = false;
 
-                    // 1) Read as many bytes as are available right now (non-blocking).
-                    while (!close) {
-                        ssize_t bytes_recv = recv(node->sockfd_d,
-                                                predecessor_buffer + pred_buffer_filled,
-                                                1,
-                                                MSG_DONTWAIT);
+                        // 1) Read as many bytes as are available right now (non-blocking).
+                        while (!close) {
+                            ssize_t bytes_recv = recv(node->sockfd_d,
+                                                    predecessor_buffer + pred_buffer_filled,
+                                                    1,
+                                                    MSG_DONTWAIT);
 
-                        printf("bytes received predecessor: %zd\n", bytes_recv);
+                            printf("bytes received predecessor: %zd\n", bytes_recv);
 
-                        if (bytes_recv == -1) {
-                            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                                // No more data at this moment, break from read loop
-                                break;
-                            } else {
-                                // Some other error happened -> we should close the connection
-                                perror("recv error on sockfd_d");
+                            if (bytes_recv == -1) {
+                                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                                    // No more data at this moment, break from read loop
+                                    break;
+                                } else {
+                                    // Some other error happened -> we should close the connection
+                                    perror("recv error on sockfd_d");
+                                    close = true;
+                                }
+                            } else if (bytes_recv == 0) {
+                                // Peer closed connection
                                 close = true;
+                            } else {
+                                // We read some data
+                                pred_buffer_filled += bytes_recv;
                             }
-                        } else if (bytes_recv == 0) {
-                            // Peer closed connection
-                            close = true;
-                        } else {
-                            // We read some data
-                            pred_buffer_filled += bytes_recv;
-                        }
-                    }
-
-                    // 2) Now parse whatever is in `predecessor_buffer`.
-                    //    We can extract mu
-
-                    printf("filled buffer size: %zu\n", pred_buffer_filled);
-
-                    size_t offset = 0;
-
-                    while (true) {
-                        // If we can’t even read the PDU type (1 byte), break
-                        if (pred_buffer_filled - offset < 1) {
-                            break;
                         }
 
-                        uint8_t pdu_type = predecessor_buffer[offset];
-                        //printf("PDU type: %u\n", pdu_type);
+                        close = false;
 
-                        // Use your function to figure out how large this PDU is
-                        ssize_t pdu_size = get_packet_size(
-                            pdu_type,                             
-                            predecessor_buffer + offset,             
-                            pred_buffer_filled           
-                        );
+                        // 2) Now parse whatever is in `predecessor_buffer`.
+                        //    We can extract mu
 
-                        //printf("PDU size: %zd\n", pdu_size);
+                        printf("filled buffer size: %zu\n", pred_buffer_filled);
 
-                        // If get_packet_size() says “-1”, it means we don't have enough bytes yet
-                        // or it's an unknown type. So stop parsing right here.
-                        if (pdu_size < 0) {
-                            break;
+                        size_t offset = 0;
+
+                        while (pred_buffer_filled > 0) {
+                            uint8_t pdu_type = predecessor_buffer[offset];
+                            ssize_t pdu_size = get_packet_size(pdu_type, predecessor_buffer + offset, pred_buffer_filled);
+
+                            if (pdu_size == 0) {
+                                break;
+                            }
+
+                            if ((ssize_t)pred_buffer_filled < pdu_size) {
+                                break;
+                            }
+
+                            PDU* pdu = malloc(sizeof(PDU));
+                            pdu->size = pdu_size;
+                            pdu->type = pdu_type;
+                            pdu->data = predecessor_buffer + offset;
+                            memcpy(pdu->buffer, predecessor_buffer + offset, pdu_size);
+                            queue_enqueue(q, pdu);
+                            memset(predecessor_buffer + offset, 0, pdu_size);
+                            offset += pdu_size;
+                            pred_buffer_filled -= pdu_size;
                         }
 
-                        // If we do know pdu_size, check if we actually have those bytes in the buffer
-                        if ((ssize_t)(pred_buffer_filled - offset) < pdu_size) {
-                            // Not enough data for this entire PDU yet, wait for more
-                            break;
+                        printf("Queue size: %d\n", q->size);
+
+                        while (!queue_is_empty(q)) {
+                            PDU* p = queue_dequeue(q);
+                            manage_pdu(node, p);
                         }
 
-                        // Now we have a complete PDU in predecessor_buffer[offset.. offset + pdu_size)
-                        // Allocate your PDU object, copy, enqueue, etc.
-                        PDU* pdu = malloc(sizeof(PDU));
-                        pdu->type = pdu_type;
-                        pdu->size = pdu_size;
-                        printf("type: %u, size: %zd\n", pdu->type, pdu->size);
-                        //pdu->buffer = malloc(pdu_size * sizeof(char));
-                        memcpy(pdu->buffer, predecessor_buffer + offset, pdu_size);
-                        //printf("PDU buffer: %.*s\n", (int)pdu_size, pdu->buffer);
-                        queue_enqueue(q, pdu);  // or manage_pdu(node, pdu) directly
-                        pred_buffer_filled -= pdu_size;
-                        offset += pdu_size;
-                    }
+                    
 
 
 
-
-                    printf("Queue size: %d\n", q->size);
-
-                    while (!queue_is_empty(q)) {
-                        PDU* p = queue_dequeue(q);
-                        manage_pdu(node, p);
-                    }
-
+                    
                 }
        
             }

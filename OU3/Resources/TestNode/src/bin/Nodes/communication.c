@@ -330,9 +330,5 @@ int q17_state(void* n, void* data) {
            node->predecessor_port);
 
 
-    // Move to state Q6
-    node->state_handler = state_handlers[STATE_6];
-    node->state_handler(node, NULL);
-
     return 0;
 }
