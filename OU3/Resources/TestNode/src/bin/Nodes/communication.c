@@ -127,6 +127,7 @@ int q5_state(void* n, void* data) {
         return 1;
     }
 
+    
     // Transfer the upper half of the hash range to the successor
     transfer_upper_half(node, successor_start, successor_end);
 
