@@ -10,6 +10,7 @@ static void manage_pdu(Node* node, PDU* pdu);
 ssize_t get_packet_size(uint8_t pdu_type, const char *buffer, size_t buffer_fill);
 void deserialize_net_new_range(struct NET_NEW_RANGE_PDU* net_join , char* buffer);
 void deserialize_net_leave(struct NET_LEAVING_PDU* net_leave, const char* buffer, size_t buffer_size);
+static void process_queue(Node* node);
 
 void print_buffer_hex(const char* buffer, size_t buffer_size){
     for(size_t i = 0; i < buffer_size; i++){
@@ -38,10 +39,6 @@ int q6_state(void* n, void* data){
 
     struct NET_ALIVE_PDU net_alive = {0};
     net_alive.type = NET_ALIVE;
-   
-    node->is_alive = true;
-    queue_t *q = queue_create(10);
-    int total_received_messages = 0;
     
     // time interval for the alive message
     int timeout = 1;
@@ -109,12 +106,7 @@ int q6_state(void* n, void* data){
                     memcpy(pdu.buffer, udp_buffer, bytes_recv);
                     manage_pdu(node, &pdu);
 
-                    if(!queue_is_empty(node->queue_for_values)){
-                        node->state_handler = state_handlers[STATE_9];
-                        node->state_handler(node, NULL);
-                    }
-
-                    printf("UDP buffer filled: %zu\n", udp_buffer_filled);
+                   // printf("UDP buffer filled: %zu\n", udp_buffer_filled);
 
                 }
 
@@ -164,23 +156,19 @@ int q6_state(void* n, void* data){
 
                         PDU* pdu = malloc(sizeof(PDU));
                         //pdu->buffer = malloc(pdu_size * sizeof(char));
-                        printf("PDU type: %u, size: %zd\n", pdu_type, pdu_size);
+                        //printf("PDU type: %u, size: %zd\n", pdu_type, pdu_size);
                         pdu->size = pdu_size;
                         pdu->type = pdu_type;
                         pdu->data = successor_buffer + offset;
                         memcpy(pdu->buffer, successor_buffer + offset, pdu_size);
-                        queue_enqueue(q, pdu);
+                        queue_enqueue(node->queue, pdu);
                         memset(successor_buffer+offset, 0, pdu_size);
                         offset += pdu_size;
                         succ_buufer_filled -= pdu_size;
 
                     }
 
-                    while(!queue_is_empty(q)){
-                        PDU* pdu = queue_dequeue(q);
-                        manage_pdu(node, pdu);
-                        free(pdu);
-                    }
+                    process_queue(node);       
 
                 }
 
@@ -222,8 +210,6 @@ int q6_state(void* n, void* data){
                         // 2) Now parse whatever is in `predecessor_buffer`.
                         //    We can extract mu
 
-                        printf("filled buffer size: %zu\n", pred_buffer_filled);
-
                         size_t offset = 0;
 
                         while (pred_buffer_filled > 0) {
@@ -243,23 +229,13 @@ int q6_state(void* n, void* data){
                             pdu->type = pdu_type;
                             pdu->data = predecessor_buffer + offset;
                             memcpy(pdu->buffer, predecessor_buffer + offset, pdu_size);
-                            queue_enqueue(q, pdu);
+                            queue_enqueue(node->queue, pdu);
                             memset(predecessor_buffer + offset, 0, pdu_size);
                             offset += pdu_size;
                             pred_buffer_filled -= pdu_size;
                         }
 
-                        printf("Queue size: %d\n", q->size);
-
-                        while (!queue_is_empty(q)) {
-                            PDU* p = queue_dequeue(q);
-                            manage_pdu(node, p);
-                        }
-
-                    
-
-
-
+                    process_queue(node);
                     
                 }
        
@@ -273,6 +249,18 @@ int q6_state(void* n, void* data){
 }
 
 
+static void process_queue(Node* node){
+    while(!queue_is_empty(node->queue)){
+        PDU* pdu = queue_dequeue(node->queue);
+        printf("the size of before the queue is %d\n", node->queue->size);
+        if(pdu){
+            manage_pdu(node, pdu);
+            free(pdu);
+        }
+        printf("the size of after the queue is %d\n", node->queue->size);
+    }
+}
+
 
 
 static void manage_pdu(Node* node, PDU* pdu){
@@ -281,12 +269,16 @@ static void manage_pdu(Node* node, PDU* pdu){
         case NET_LEAVING:
             struct NET_LEAVING_PDU net_leave = {0};
             deserialize_net_leave(&net_leave, pdu->buffer, pdu->size);
+            process_queue(node);
+            printf("Queue size before going to state 16: %d\n", node->queue->size);
             node->state_handler = state_handlers[STATE_16];
             node->state_handler(node, &net_leave);
+            printf("Queue size after going to state 16: %d\n", node->queue->size);
             break;
         case NET_NEW_RANGE:
             struct NET_NEW_RANGE_PDU net_new_range = {0};
             deserialize_net_new_range(&net_new_range, pdu->buffer);
+            process_queue(node);
             node->state_handler = state_handlers[STATE_15];
             node->state_handler(node, &net_new_range);
             break;

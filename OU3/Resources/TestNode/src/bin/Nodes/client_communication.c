@@ -34,7 +34,7 @@ void send_val_lookup_response(const struct Entry* entry, int socket_fd);
 
 int q9_state(void* n, void* data) {
     Node* node = (Node*)n;
-    printf("[Q9 state]\n");
+    //printf("[Q9 state]\n");
 
     // now we will transfer data into the queue as we have inserted data into the queue in the state 6.
     
@@ -140,10 +140,6 @@ static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu) {
         memcpy(entry->email, pdu->email, pdu->email_length);
         entry->email_length = pdu->email_length;
 
-        printf("{SSN: %.*s, Name: %.*s, Email: %.*s}\n",
-        (int)SSN_LENGTH, entry->ssn,
-        (int)entry->name_length, entry->name,
-        (int)entry->email_length, entry->email);
 
 
         //printf("we are about to insert the value\n");

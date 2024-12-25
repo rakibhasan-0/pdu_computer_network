@@ -70,7 +70,7 @@ struct Node {
     uint8_t hash_range_end;
     uint8_t hash_span;
 
-    queue_t* queue_for_values;
+    queue_t* queue;
 
     // Node's local details
     uint16_t port;

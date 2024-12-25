@@ -170,15 +170,14 @@ int q11_state(void* n, void* data) {
 int q15_state(void* n, void* data) {
 
     printf("[q15 state]\n");
-    printf("We are in state 15\n");
 
     Node* node = (Node*)n;
     struct NET_NEW_RANGE_PDU* net_new_range = (struct NET_NEW_RANGE_PDU*)data;
 
-    printf("Received NET_NEW_RANGE message\n");
-    printf("New range start: %d\n", net_new_range->range_start);
-    printf("New range end: %d\n", net_new_range->range_end);
-    printf("Node's current range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
+    //printf("Received NET_NEW_RANGE message\n");
+    //printf("New range start: %d\n", net_new_range->range_start);
+    //printf("New range end: %d\n", net_new_range->range_end);
+    //printf("Node's current range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
 
     // Determine whether to send the response to the successor or the predecessor
     bool send_to_successor = (node->hash_range_end != 255 && net_new_range->range_start == node->hash_range_end + 1);
@@ -193,7 +192,7 @@ int q15_state(void* n, void* data) {
 
 
 
-        printf("The successor is %s:%d\n", inet_ntoa(node->successor_ip_address), node->successor_port);
+        //printf("The successor is %s:%d\n", inet_ntoa(node->successor_ip_address), node->successor_port);
         int send_status = send(node->sockfd_b, buffer, sizeof(buffer), 0);
         if (send_status == -1) {
             perror("Send failed");
@@ -207,7 +206,7 @@ int q15_state(void* n, void* data) {
         struct NET_NEW_RANGE_RESPONSE_PDU net_new_range_response = {0};
         net_new_range_response.type = NET_NEW_RANGE_RESPONSE;
 
-        printf("The predecessor is %s:%d\n", inet_ntoa(node->predecessor_ip_address), node->predecessor_port);
+        //printf("The predecessor is %s:%d\n", inet_ntoa(node->predecessor_ip_address), node->predecessor_port);
         int send_status = send(node->sockfd_d, &net_new_range_response, sizeof(net_new_range_response), 0);
         if (send_status == -1) {
             perror("Send failed");
@@ -243,7 +242,7 @@ int q18_state(void* n, void* data){
     struct NET_CLOSE_CONNECTION_PDU net_close_connection = {0};
     net_close_connection.type = NET_CLOSE_CONNECTION;
     int send_status = send(node->sockfd_b, &net_close_connection, sizeof(net_close_connection), 0);
-    printf("Sending NET_CLOSE_CONNECTION message to the successor\n");
+    //printf("Sending NET_CLOSE_CONNECTION message to the successor\n");
     if (send_status == -1){
         perror("send failed");
         return 1;
@@ -261,7 +260,7 @@ int q18_state(void* n, void* data){
    
 
     int send_leaving_status = send(node->sockfd_d, &net_leaving, sizeof(net_leaving), 0);
-    printf("Sending NET_LEAVING message to the predecessor\n");
+    //printf("Sending NET_LEAVING message to the predecessor\n");
     if (send_leaving_status == -1){
         perror("send failed");
         return 1;
@@ -288,7 +287,7 @@ int q16_state(void* n, void* data){
 
     // Prepare 'new_address' in network byte order for inet_ntoa or inet_ntop
     struct in_addr new_successor_addr;
-    new_successor_addr.s_addr = htonl(net_leaving->new_address); // Convert to network byte order
+    new_successor_addr.s_addr = net_leaving->new_address; // Convert to network byte order
 
     char ip_str[INET_ADDRSTRLEN];
     if (inet_ntop(AF_INET, &new_successor_addr, ip_str, sizeof(ip_str)) == NULL) {
@@ -354,7 +353,8 @@ int q16_state(void* n, void* data){
 
         printf("Connected to new successor: %s:%d\n", ip_str, net_leaving->new_port);
     }
-
+     
+     printf("Moving to state 6\n");
     // Transition to state 6
     return 0;
 }
