@@ -51,7 +51,7 @@ typedef struct Node Node;
 struct PDU {
     uint8_t type;
     char* data;
-    char buffer[2048];
+    char buffer[4096];
     size_t size;
 };
 

@@ -12,14 +12,6 @@ void deserialize_net_new_range(struct NET_NEW_RANGE_PDU* net_join , char* buffer
 void deserialize_net_leave(struct NET_LEAVING_PDU* net_leave, const char* buffer, size_t buffer_size);
 static void process_queue(Node* node);
 
-void print_buffer_hex(const char* buffer, size_t buffer_size){
-    for(size_t i = 0; i < buffer_size; i++){
-        printf("%02x ", (unsigned char)buffer[i]);
-    }
-    printf("\n");
-}
-
-
 
 
 // based on the graph, I(gazi) think that state_6 kinda core since most states are being handled from here.
@@ -46,10 +38,30 @@ int q6_state(void* n, void* data){
     struct pollfd poll_fd[4];
     poll_fd[0].fd = node->sockfd_a;
     poll_fd[0].events = POLLIN;
-    poll_fd[1].fd = node->sockfd_b;
-    poll_fd[1].events = POLLIN;
-    poll_fd[2].fd = node->sockfd_d;
-    poll_fd[2].events = POLLIN;
+    int num_fds = 1;
+
+    // if the successor open but the predecessor is not open.
+    if(node->sockfd_b > 0 && node->sockfd_d < 0){
+        poll_fd[1].fd = node->sockfd_b;
+        poll_fd[1].events = POLLIN;
+        num_fds = 2;
+    }
+
+    // if predecessor is open but the successor is not open.
+    else if(node->sockfd_d > 0 && node->sockfd_b < 0){
+        poll_fd[1].fd = node->sockfd_d;
+        poll_fd[1].events = POLLIN;
+        num_fds = 2;
+    }
+
+    // if both the predecessor and successor are open.
+    else if(node->sockfd_b > 0 && node->sockfd_d > 0){
+        poll_fd[1].fd = node->sockfd_b;
+        poll_fd[1].events = POLLIN;
+        poll_fd[2].fd = node->sockfd_d;
+        poll_fd[2].events = POLLIN;
+        num_fds = 3;
+    }
  
 
     while(1){
@@ -70,7 +82,7 @@ int q6_state(void* n, void* data){
         }
 
        // printf("the node have %d entries", ht_get_entry_count(node->hash_table));
-        int poll_status = poll(poll_fd, 3, 4000);
+        int poll_status = poll(poll_fd, num_fds, 400);
 
         if (poll_status == -1 && errno != EINTR) {
             perror("poll failed");
@@ -84,9 +96,9 @@ int q6_state(void* n, void* data){
         }
 
 
-        for(int i = 0; i < 3; i++){
+        for(int i = 0; i < num_fds; i++){
             
-            if(poll_fd[i].revents == POLLIN){
+            if(poll_fd[i].revents & POLLIN){
                 
                 // udp socket
                 if(poll_fd[i].fd == node->sockfd_a){
@@ -112,27 +124,30 @@ int q6_state(void* n, void* data){
 
                 // TCP socket for the successor 
                 else if(poll_fd[i].fd == node->sockfd_b){
-                   
-                    bool close = false;
+                    bool time_to_close = false;
 
                     // we are reading all of the bytes.
-                    while(!close){
+                    while(!time_to_close){
                         
                         ssize_t bytes_recv = recv(node->sockfd_b, successor_buffer + succ_buufer_filled, 1,
                                                     MSG_DONTWAIT);
 
-                        printf("bytes received successor: %zd\n", bytes_recv);
+                        //printf("bytes received successor: %zd\n", bytes_recv);
 
                         if(bytes_recv == -1){
                             if(errno == EAGAIN || errno == EWOULDBLOCK){
                                 break;
                             }
                             else{
-                                close = true;
+                                time_to_close = true;
                             }
                         }
                         else if(bytes_recv == 0){
-                            close = true;            
+                            time_to_close = true;
+                            close(node->sockfd_b);
+                            node->sockfd_b = -1;
+                            break;
+
                         }else{
                             succ_buufer_filled += bytes_recv;
                         }
@@ -146,7 +161,7 @@ int q6_state(void* n, void* data){
                         uint8_t pdu_type = successor_buffer[offset];
                         ssize_t pdu_size = get_packet_size(pdu_type, successor_buffer + offset, succ_buufer_filled);
 
-                        if(pdu_size == 0){
+                        if(pdu_size < 0){
                             break;
                         }
 
@@ -159,9 +174,12 @@ int q6_state(void* n, void* data){
                         //printf("PDU type: %u, size: %zd\n", pdu_type, pdu_size);
                         pdu->size = pdu_size;
                         pdu->type = pdu_type;
+                        printf("the type of the pdu is (succ) %d\n", pdu->type);
+
                         pdu->data = successor_buffer + offset;
                         memcpy(pdu->buffer, successor_buffer + offset, pdu_size);
                         queue_enqueue(node->queue, pdu);
+                        printf("the size of the queue is(succ) %d\n", node->queue->size);
                         memset(successor_buffer+offset, 0, pdu_size);
                         offset += pdu_size;
                         succ_buufer_filled -= pdu_size;
@@ -176,16 +194,16 @@ int q6_state(void* n, void* data){
         
                 // predecessor socket
                 else if (poll_fd[i].fd == node->sockfd_d) {
-                    bool close = false;
+                    bool time_to_close = false;
 
                         // 1) Read as many bytes as are available right now (non-blocking).
-                        while (!close) {
+                        while (!time_to_close) {
                             ssize_t bytes_recv = recv(node->sockfd_d,
                                                     predecessor_buffer + pred_buffer_filled,
                                                     1,
                                                     MSG_DONTWAIT);
 
-                            printf("bytes received predecessor: %zd\n", bytes_recv);
+                            //printf("bytes received predecessor: %zd\n", bytes_recv);
 
                             if (bytes_recv == -1) {
                                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
@@ -194,29 +212,31 @@ int q6_state(void* n, void* data){
                                 } else {
                                     // Some other error happened -> we should close the connection
                                     perror("recv error on sockfd_d");
-                                    close = true;
+                                    time_to_close = true;
                                 }
                             } else if (bytes_recv == 0) {
                                 // Peer closed connection
-                                close = true;
+                                time_to_close = true;
+                                close(node->sockfd_d);
+                                node->sockfd_d = -1;
+                                break;
                             } else {
                                 // We read some data
                                 pred_buffer_filled += bytes_recv;
                             }
                         }
 
-                        close = false;
 
                         // 2) Now parse whatever is in `predecessor_buffer`.
                         //    We can extract mu
 
                         size_t offset = 0;
-
+                        printf("pred_buffer_filled: %zu\n", pred_buffer_filled);
                         while (pred_buffer_filled > 0) {
                             uint8_t pdu_type = predecessor_buffer[offset];
                             ssize_t pdu_size = get_packet_size(pdu_type, predecessor_buffer + offset, pred_buffer_filled);
 
-                            if (pdu_size == 0) {
+                            if (pdu_size < 0) {
                                 break;
                             }
 
@@ -228,8 +248,10 @@ int q6_state(void* n, void* data){
                             pdu->size = pdu_size;
                             pdu->type = pdu_type;
                             pdu->data = predecessor_buffer + offset;
+                            printf("the type of the pdu is (pred) %d\n", pdu->type);                 
                             memcpy(pdu->buffer, predecessor_buffer + offset, pdu_size);
                             queue_enqueue(node->queue, pdu);
+                            printf("the size of the queue is(pred) %d\n", node->queue->size);
                             memset(predecessor_buffer + offset, 0, pdu_size);
                             offset += pdu_size;
                             pred_buffer_filled -= pdu_size;
@@ -251,13 +273,15 @@ int q6_state(void* n, void* data){
 
 static void process_queue(Node* node){
     while(!queue_is_empty(node->queue)){
-        PDU* pdu = queue_dequeue(node->queue);
         printf("the size of before the queue is %d\n", node->queue->size);
+        PDU* pdu = queue_dequeue(node->queue);
+
         if(pdu){
+            printf("the type of the pdu from the %d\n", pdu->type);
             manage_pdu(node, pdu);
             free(pdu);
         }
-        printf("the size of after the queue is %d\n", node->queue->size);
+        //printf("the size of after the queue is %d\n", node->queue->size);
     }
 }
 
@@ -269,16 +293,16 @@ static void manage_pdu(Node* node, PDU* pdu){
         case NET_LEAVING:
             struct NET_LEAVING_PDU net_leave = {0};
             deserialize_net_leave(&net_leave, pdu->buffer, pdu->size);
-            process_queue(node);
-            printf("Queue size before going to state 16: %d\n", node->queue->size);
+            //process_queue(node);
+            //printf("Queue size before going to state 16: %d\n", node->queue->size);
             node->state_handler = state_handlers[STATE_16];
             node->state_handler(node, &net_leave);
-            printf("Queue size after going to state 16: %d\n", node->queue->size);
+            //printf("Queue size after going to state 16: %d\n", node->queue->size);
             break;
         case NET_NEW_RANGE:
             struct NET_NEW_RANGE_PDU net_new_range = {0};
             deserialize_net_new_range(&net_new_range, pdu->buffer);
-            process_queue(node);
+            //process_queue(node);
             node->state_handler = state_handlers[STATE_15];
             node->state_handler(node, &net_new_range);
             break;
@@ -412,7 +436,6 @@ void deserialize_net_leave(struct NET_LEAVING_PDU* net_leave, const char* buffer
         return;
     }
 
-    print_buffer_hex(buffer, buffer_size);
     size_t offset = 0;
 
     net_leave->type = buffer[offset];

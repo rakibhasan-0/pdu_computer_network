@@ -144,11 +144,10 @@ static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu) {
 
         //printf("we are about to insert the value\n");
         node->hash_table = ht_insert(node->hash_table, entry->ssn, entry);
-        //printf("Value inserted successfully\n");
+        printf("Value inserted successfully\n");
     } else {
 
         // we will forward the pdu to the successor.
-        //printf("Forwarding VAL_INSERT to successor\n");
         size_t pdu_size = 1 + SSN_LENGTH + 1 + pdu->name_length + 1 + pdu->email_length;
         uint8_t* out_buffer = malloc(pdu_size);
         if (!out_buffer) {
@@ -156,7 +155,7 @@ static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu) {
             return;
         }
         size_t offset = 0;
-        out_buffer[offset++] = pdu->type;
+        out_buffer[offset++] = VAL_INSERT;
         memcpy(out_buffer + offset, pdu->ssn, SSN_LENGTH);
         offset += SSN_LENGTH;
 
@@ -173,6 +172,7 @@ static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu) {
             perror("send failure");
             return;
         }
+        printf("Forwarding VAL_INSERT to successor\n");
 
         free(out_buffer);
 

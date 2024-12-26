@@ -72,8 +72,12 @@ int q7_state(void* n, void* data) {
 
     int accept_status = accept(node->listener_socket, (struct sockaddr*)&sender_addr, &sender_addr_len);
     if (accept_status == -1) {
-        perror("accept failed");
-        return 1;
+        if(errno == EAGAIN || errno == EWOULDBLOCK) {
+            return 0;
+        }else{
+            printf("accept failed\n");
+            return 1;
+        }
     }
 
     // The sender_addr is in network order. Store predecessor's IP and port:

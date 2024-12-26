@@ -1,28 +1,55 @@
 #include "queue.h"
 
-// Helper function to resize the queue dynamically
+/**
+ * @brief Resizes the queue by doubling its current capacity.
+ *
+ * @param q Pointer to the queue to resize.
+ */
 static void queue_resize(queue_t* q) {
     int new_capacity = q->capacity * 2;
-    void** new_items = realloc(q->items, new_capacity * sizeof(void*));
+    void** new_items = malloc(new_capacity * sizeof(void*));
     if (new_items == NULL) {
-        perror("realloc:");
+        perror("Failed to allocate memory during queue_resize");
         exit(EXIT_FAILURE);
     }
 
+    // Copy elements to the new buffer in correct order
+    for(int i = 0; i < q->size; i++) {
+        new_items[i] = q->items[(q->front + i) % q->capacity];
+    }
+
+    // Free the old buffer
+    free(q->items);
+
+    // Update queue properties
     q->items = new_items;
+    q->front = 0;
+    q->rear = q->size - 1;
     q->capacity = new_capacity;
 }
 
+/**
+ * @brief Creates a new queue with the specified initial capacity.
+ *
+ * @param capacity Initial capacity of the queue.
+ * @return Pointer to the newly created queue.
+ */
 queue_t* queue_create(int capacity) {
-    queue_t* q = (queue_t*)malloc(sizeof(queue_t));
-    if (q == NULL) {
-        perror("malloc:");
+    if (capacity <= 0) {
+        fprintf(stderr, "Queue capacity must be greater than 0.\n");
         exit(EXIT_FAILURE);
     }
 
-    q->items = (void**)malloc(capacity * sizeof(void*));
+    queue_t* q = malloc(sizeof(queue_t));
+    if (q == NULL) {
+        perror("Failed to allocate memory for queue");
+        exit(EXIT_FAILURE);
+    }
+
+    q->items = malloc(capacity * sizeof(void*));
     if (q->items == NULL) {
-        perror("malloc:");
+        perror("Failed to allocate memory for queue items");
+        free(q);
         exit(EXIT_FAILURE);
     }
 
@@ -31,26 +58,69 @@ queue_t* queue_create(int capacity) {
     q->size = 0;
     q->capacity = capacity;
 
+    if (pthread_mutex_init(&q->lock, NULL) != 0) {
+        perror("Failed to initialize mutex for queue");
+        free(q->items);
+        free(q);
+        exit(EXIT_FAILURE);
+    }
+
     return q;
 }
 
+/**
+ * @brief Checks if the queue is empty.
+ *
+ * @param q Pointer to the queue.
+ * @return true if the queue is empty, false otherwise.
+ */
 bool queue_is_empty(queue_t* q) {
-    return q->size == 0;
+    bool empty;
+    pthread_mutex_lock(&q->lock);
+    empty = (q->size == 0);
+    pthread_mutex_unlock(&q->lock);
+    return empty;
 }
 
+/**
+ * @brief Enqueues an item to the queue.
+ *
+ * @param q Pointer to the queue.
+ * @param item Pointer to the item to enqueue.
+ */
 void queue_enqueue(queue_t* q, void* item) {
+    if (item == NULL) {
+        fprintf(stderr, "Cannot enqueue NULL item.\n");
+        return;
+    }
+
+    pthread_mutex_lock(&q->lock);
+
+    // Resize if the queue is full
     if (q->size == q->capacity) {
         queue_resize(q);
     }
 
+    // Calculate the new rear position
     q->rear = (q->rear + 1) % q->capacity;
     q->items[q->rear] = item;
     q->size++;
+
+    pthread_mutex_unlock(&q->lock);
 }
 
+/**
+ * @brief Dequeues an item from the queue.
+ *
+ * @param q Pointer to the queue.
+ * @return Pointer to the dequeued item, or NULL if the queue is empty.
+ */
 void* queue_dequeue(queue_t* q) {
-    if (queue_is_empty(q)) {
-        fprintf(stderr, "Queue is empty\n");
+    pthread_mutex_lock(&q->lock);
+
+    if (q->size == 0) {
+        fprintf(stderr, "Queue is empty. Cannot dequeue.\n");
+        pthread_mutex_unlock(&q->lock);
         return NULL;
     }
 
@@ -58,9 +128,43 @@ void* queue_dequeue(queue_t* q) {
     q->front = (q->front + 1) % q->capacity;
     q->size--;
 
+    pthread_mutex_unlock(&q->lock);
     return item;
 }
 
+/**
+ * @brief Retrieves the current size of the queue.
+ *
+ * @param q Pointer to the queue.
+ * @return Current number of items in the queue.
+ */
 int queue_size(queue_t* q) {
-    return q->size;
+    int size;
+    pthread_mutex_lock(&q->lock);
+    size = q->size;
+    pthread_mutex_unlock(&q->lock);
+    return size;
+}
+
+/**
+ * @brief Destroys the queue and frees all associated resources.
+ *
+ * @param q Pointer to the queue.
+ */
+void queue_destroy(queue_t* q) {
+    if (q == NULL) return;
+
+    pthread_mutex_lock(&q->lock);
+
+    free(q->items);
+    q->items = NULL;
+    q->front = 0;
+    q->rear = -1;
+    q->size = 0;
+    q->capacity = 0;
+
+    pthread_mutex_unlock(&q->lock);
+
+    pthread_mutex_destroy(&q->lock);
+    free(q);
 }
