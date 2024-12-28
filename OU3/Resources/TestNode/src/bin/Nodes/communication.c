@@ -187,7 +187,6 @@ int q14_state(void* n, void* data){
     }
 
     node->state_handler = state_handlers[STATE_6];
-    free(data);
     node->state_handler(node, NULL);
 
     return 0;
@@ -226,7 +225,7 @@ int q13_state(void* n, void* data){
     // close the previous socket connection
     shutdown(node->sockfd_b, SHUT_RDWR);
     close(node->sockfd_b);
-    free(data);
+    //free(data);
     
 
     // creating a new socket for the new successor.
