@@ -273,14 +273,17 @@ int q6_state(void* n, void* data){
 
 static void process_queue(Node* node){
     while(!queue_is_empty(node->queue)){
-        printf("the size of before the queue is %d\n", node->queue->size);
+        //printf("the size of before the queue is %d\n", node->queue->size);
         PDU* pdu = queue_dequeue(node->queue);
 
         if(pdu){
-            printf("the type of the pdu from the %d\n", pdu->type);
+            //printf("the type of the pdu from the %d\n", pdu->type);
             manage_pdu(node, pdu);
-            free(pdu);
+
         }
+
+        free(pdu);
+
         //printf("the size of after the queue is %d\n", node->queue->size);
     }
 }

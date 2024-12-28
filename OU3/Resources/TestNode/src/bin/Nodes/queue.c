@@ -109,6 +109,14 @@ void queue_enqueue(queue_t* q, void* item) {
     pthread_mutex_unlock(&q->lock);
 }
 
+void clean_up_queue(queue_t* q){
+
+   for(int i = 0; i < q->size; i++){
+       free(q->items[i]);
+   }
+    
+}
+
 /**
  * @brief Dequeues an item from the queue.
  *
@@ -155,7 +163,7 @@ void queue_destroy(queue_t* q) {
     if (q == NULL) return;
 
     pthread_mutex_lock(&q->lock);
-
+    clean_up_queue(q);
     free(q->items);
     q->items = NULL;
     q->front = 0;

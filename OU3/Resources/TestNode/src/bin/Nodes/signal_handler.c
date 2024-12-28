@@ -49,6 +49,9 @@ static void close_connection (Node* node){
         }
     }
 
+    // we may need to deallocate the memory here.
+    destroy_allocated_memory(node);
+
 }
 
 

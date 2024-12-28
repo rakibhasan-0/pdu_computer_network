@@ -14,11 +14,11 @@ typedef struct Node Node;
 
 struct Entry {
     char* ssn; 
-    char* name; // Adjust size as needed
-    char* email; // Adjust size as needed
+    char* name; 
+    char* email;
     size_t name_length;
     size_t email_length;
-    struct Entry* next; // we maynot need this as we will use the hash table to store the entries.
+    //struct Entry* next; // we maynot need this as we will use the hash table to store the entries.
 };
 
 typedef struct Entry Entry;

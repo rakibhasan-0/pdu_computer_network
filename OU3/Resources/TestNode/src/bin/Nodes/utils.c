@@ -109,12 +109,11 @@ void transfer_upper_half(void* node, uint8_t range_start, uint8_t range_end){
         }
 
         ht_remove(n->hash_table, ssn);
-
         free(out_buffer);
-        free(entry->ssn);
-        free(entry->name);
-        free(entry->email);
-        free(entry);
+        //free(entry->ssn);
+        //free(entry->name);
+        //free(entry->email);
+        //free(entry);
        // sleep(1);
 
     }   
@@ -179,15 +178,30 @@ void transfer_all_entries(void* n, bool to_successor){
         }
 
         ht_remove(noed->hash_table, ssn);
-
         free(out_buffer);
-        free(entry->ssn);
-        free(entry->name);
-        free(entry->email);
-        free(entry);
+        
+        //free(entry->ssn);
+        //free(entry->name);
+        //free(entry->email);
+        //free(entry);
        // sleep(1);
 
     }
 
 
+}
+
+void destroy_allocated_memory(void* n){
+    Node* node = (Node*)n;
+
+    if(node->hash_table){
+        ht_destroy(node->hash_table);
+    }
+    if(node->queue){
+        queue_destroy(node->queue);
+    }
+
+    
+    freeaddrinfo(node->tracker_addr);
+    free(node);
 }

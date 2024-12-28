@@ -66,6 +66,9 @@ int q7_state(void* n, void* data) {
         return 1;
     }
 
+    // we can free the memory now
+    free(net_get_node_response);
+
     // Now we accept a new predecessor. The accept call returns a new socket.
     struct sockaddr_in sender_addr;
     socklen_t sender_addr_len = sizeof(sender_addr);
@@ -89,31 +92,33 @@ int q7_state(void* n, void* data) {
     printf("Accepted new predecessor: %s:%d\n", inet_ntoa(node->predecessor_ip_address), node->predecessor_port);
 
     // Receive the NET_JOIN_RESPONSE_PDU from predecessor
-    struct NET_JOIN_RESPONSE_PDU net_join_response = {0};
-    int recv_status = recv(accept_status, &net_join_response, sizeof(net_join_response), 0);
+    struct NET_JOIN_RESPONSE_PDU* net_join_response = malloc(sizeof(struct NET_JOIN_RESPONSE_PDU));
+    memset(net_join_response, 0, sizeof(struct NET_JOIN_RESPONSE_PDU));
+
+    int recv_status = recv(accept_status, net_join_response, sizeof(*net_join_response), 0);
     if (recv_status == -1) {
         perror("recv failed");
         return 1;
     }
     // Converting all fields in NET_JOIN_RESPONSE_PDU to host order...
-    net_join_response.next_address = net_join_response.next_address; // we are not converting the address to the host order, kept the network order, it is very unusual!!
-    net_join_response.next_port = ntohs(net_join_response.next_port);
-    net_join_response.range_start = net_join_response.range_start;
-    net_join_response.range_end = net_join_response.range_end;
+    net_join_response->next_address = net_join_response->next_address; // we are not converting the address to the host order, kept the network order, it is very unusual!!
+    net_join_response->next_port = ntohs(net_join_response->next_port);
+    net_join_response->range_start = net_join_response->range_start;
+    net_join_response->range_end = net_join_response->range_end;
 
 
 
     printf("Received NET_JOIN_RESPONSE from predecessor\n");
     // we are updating the hash range of the node.
-    node->hash_range_start = net_join_response.range_start;
-    node->hash_range_end = net_join_response.range_end;
+    node->hash_range_start = net_join_response->range_start;
+    node->hash_range_end = net_join_response->range_end;
     node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
     printf("Node's updated range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
     printf("Node's updated hash range: %d\n", node->hash_span);
 
     // Move to q8_state to connect to the successor
     node->state_handler = state_handlers[STATE_8];
-    node->state_handler(node, &net_join_response);
+    node->state_handler(node, net_join_response);
 
     return 0;
 }
@@ -124,41 +129,33 @@ int q8_state(void* n, void* data) {
     printf("[q8 state]\n");
 
     Node* node = (Node*)n;
-    struct NET_JOIN_RESPONSE_PDU net_join_response = *(struct NET_JOIN_RESPONSE_PDU*)data;
-
-    // net_join_response.next_address is in network order
-    // net_join_response.next_port is in host order
+    struct NET_JOIN_RESPONSE_PDU* net_join_response = (struct NET_JOIN_RESPONSE_PDU*)data;
 
     struct sockaddr_in addr = {0};
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = net_join_response.next_address; // use directly, already network order
-    addr.sin_port = htons(net_join_response.next_port);    // convert port to network order
+    addr.sin_addr.s_addr = net_join_response->next_address;
+    addr.sin_port = htons(net_join_response->next_port);
 
-    // Connect to the successor via TCP
     node->sockfd_b = socket(AF_INET, SOCK_STREAM, 0);
     if (node->sockfd_b == -1) {
         perror("socket failure");
+        free(net_join_response);
         return 1;
     }
 
-    int connect_status = connect(node->sockfd_b, (struct sockaddr*)&addr, sizeof(addr));
-    if (connect_status == -1) {
+    if (connect(node->sockfd_b, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         perror("connect failure");
+        free(net_join_response);
+        close(node->sockfd_b);
         return 1;
     }
 
-    // Store successor information:
-    // IP is already in network order
-    // Port is in host order
     node->successor_ip_address = addr.sin_addr;
-    node->successor_port = net_join_response.next_port;
+    node->successor_port = net_join_response->next_port;
 
-    printf("Node's updated successor: %s:%d\n",
-           inet_ntoa(node->successor_ip_address),
-           node->successor_port);
+    free(net_join_response);
 
-    // Move to state q6
-    node->state_handler = state_handlers[5];
+    node->state_handler = state_handlers[STATE_6];
     node->state_handler(node, NULL);
 
     return 0;

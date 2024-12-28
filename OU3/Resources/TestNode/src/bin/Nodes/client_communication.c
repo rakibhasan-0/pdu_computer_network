@@ -57,6 +57,9 @@ int q9_state(void* n, void* data) {
             if(parse_val_insert_pdu(pdu->buffer, &pdu_insert)) {
                 insertion_of_value(node, &pdu_insert);
             }
+            free(pdu_insert.name);
+            free(pdu_insert.email);
+            
             break;
 
         case VAL_REMOVE:
