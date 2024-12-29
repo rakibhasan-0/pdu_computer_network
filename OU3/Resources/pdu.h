@@ -27,6 +27,8 @@
 #ifndef PDU_DEF
 #define PDU_DEF
 
+
+#pragma pack(push, 1)
 /**
 * @brief NET_ALIVE_PDU (UDP)
 *
@@ -282,4 +284,5 @@ struct STUN_RESPONSE_PDU {
     uint32_t address;
 };
 
+#pragma pack(pop)
 #endif // PDU_DEF
