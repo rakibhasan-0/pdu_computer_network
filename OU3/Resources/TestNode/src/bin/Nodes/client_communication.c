@@ -61,21 +61,23 @@ int q9_state(void* n, void* data) {
             break;
 
         case VAL_REMOVE:
-            printf("Handling VAL_REMOVE\n");
-            struct VAL_REMOVE_PDU val_remove_pdu;
-        	//parse_val_remove_pdu(entry_data, &val_remove_pdu);
-            printf("SSN: %s\n", val_remove_pdu.ssn);
-            remove_value(node, &val_remove_pdu);
-            remove_value(node, &val_remove_pdu);
+            struct VAL_REMOVE_PDU pdu_remove = {0};
+
+            // Parse the buffer into the PDU structure of the VAL_REMOVE_PDU type
+            if(parse_val_remove_pdu(pdu->buffer, &pdu_remove)) {
+                remove_value(node, &pdu_remove);
+            }
             break;
-        case VAL_LOOKUP: 
-            printf("Handling VAL_LOOKUP\n");
-            struct VAL_LOOKUP_PDU val_lookup_pdu;
-            parse_val_lookup_pdu(pdu->buffer, &val_lookup_pdu);
-            printf("SSN: %s\n", val_lookup_pdu.ssn);
-            lookup_value(node, &val_lookup_pdu);
-        
+
+        case VAL_LOOKUP:
+            struct VAL_LOOKUP_PDU pdu_lookup = {0};
+
+            // Parse the buffer into the PDU structure of the VAL_LOOKUP_PDU type
+            if(parse_val_lookup_pdu(pdu->buffer, &pdu_lookup)) {
+                lookup_value(node, &pdu_lookup);
+            }
             break;
+
         default:
             printf("Unknown PDU type: %d\n", pdu_type);
             break;

@@ -1,9 +1,5 @@
 #include "signal_handler.h"
 
-
-
-
-
 size_t construct_net_new_range(struct NET_NEW_RANGE_PDU* pdu, char* buffer, Node* node){ 
 
     size_t offset = 0; 
@@ -14,16 +10,6 @@ size_t construct_net_new_range(struct NET_NEW_RANGE_PDU* pdu, char* buffer, Node
     return offset;
 
 }
-
-
-
-
-
-
-
-
-
-
 
 // that function intends to close the connection by closing all the sockets.
 static void close_connection (Node* node){
@@ -50,7 +36,6 @@ static void close_connection (Node* node){
     }
 
 }
-
 
 /**
  * this function initialy checks if the node is empty or not.
@@ -105,22 +90,20 @@ int q11_state(void* n, void* data) {
 
     Node* node = (Node*)n;
 
-    // Preparing NET_NEW_RANGE message
     struct NET_NEW_RANGE_PDU net_new_range = {0};
     net_new_range.type = NET_NEW_RANGE;
-    
-    char buffer[sizeof(net_new_range)];
-    
-    size_t size_to_send = construct_net_new_range(&net_new_range, buffer, node);
+    net_new_range.range_start = node->hash_range_start;
+    net_new_range.range_end = node->hash_range_end;
 
-    // Now we are deciding whether to send the message to the successor or the predecessor.
+    char buffer[sizeof(net_new_range)];
+    memcpy(buffer, &net_new_range, sizeof(net_new_range));
+
     bool send_to_successor = node->hash_range_start == 0;
 
-    // Send NET_NEW_RANGE message
     int send_status;
     if (send_to_successor) {
         printf("Sending NET_NEW_RANGE message to the successor\n");
-        send_status = send(node->sockfd_b, buffer, size_to_send, 0);
+        send_status = send(node->sockfd_b, buffer, sizeof(buffer), 0);
         if (send_status == -1) {
             perror("send to successor failed");
             return 1;
@@ -128,7 +111,7 @@ int q11_state(void* n, void* data) {
         printf("The successor is %s:%d\n", inet_ntoa(node->successor_ip_address), node->successor_port);
     } else {
         printf("Sending NET_NEW_RANGE message to the predecessor\n");
-        send_status = send(node->sockfd_d,buffer,size_to_send, 0);
+        send_status = send(node->sockfd_d, buffer, sizeof(buffer), 0);
         if (send_status == -1) {
             perror("send to predecessor failed");
             return 1;
@@ -136,16 +119,12 @@ int q11_state(void* n, void* data) {
         printf("The predecessor is %s:%d\n", inet_ntoa(node->predecessor_ip_address), node->predecessor_port);
     }
 
-    // Receive NET_NEW_RANGE_RESPONSE
     struct NET_NEW_RANGE_RESPONSE_PDU net_new_range_response = {0};
     printf("Waiting for NET_NEW_RANGE_RESPONSE...\n");
 
     int recv_status;
-    // flush the socket buffer
     if (send_to_successor) {
         recv_status = recv(node->sockfd_b, &net_new_range_response, sizeof(net_new_range_response), 0);
-        
-
     } else {
         recv_status = recv(node->sockfd_d, &net_new_range_response, sizeof(net_new_range_response), 0);
     }
@@ -163,6 +142,7 @@ int q11_state(void* n, void* data) {
         node->state_handler = state_handlers[STATE_18];
         node->state_handler(node, NULL);
     }
+
     return 0;
 }
 
@@ -221,58 +201,45 @@ int q15_state(void* n, void* data) {
 }
 
 
-// the Q18 state, where we will close the connection with the predecessor and successor and exit gracefully.
-int q18_state(void* n, void* data){
-
+// The Q18 state, where we will close the connection with the predecessor and successor and exit gracefully.
+int q18_state(void* n, void* data) {
     printf("[q18 state]\n");
 
     Node* node = (Node*)n;
 
-    // as we have updated the hash range to the node's successor, I mean we have mereged the hash range.
-    // here we will transfer the data to the successor.
     bool to_successor = false;
-    if(node->hash_range_start == 0){
+    if (node->hash_range_start == 0) {
         to_successor = true;
     }
 
-   // we are transferring the entries to the successor/predecessor.
+    printf("[transfer_all_entries]\n");
     transfer_all_entries(node, to_successor);
 
-    // now we will send NET_CLOSE_CONNECTION message to the successor.
     struct NET_CLOSE_CONNECTION_PDU net_close_connection = {0};
     net_close_connection.type = NET_CLOSE_CONNECTION;
     int send_status = send(node->sockfd_b, &net_close_connection, sizeof(net_close_connection), 0);
-    //printf("Sending NET_CLOSE_CONNECTION message to the successor\n");
-    if (send_status == -1){
+    if (send_status == -1) {
         perror("send failed");
         return 1;
     }
 
-
-    // now we will send NET_LEAVING message to the predecessor.
-    // in that message we will add the new successor's address and port.
     struct NET_LEAVING_PDU net_leaving = {0};
     net_leaving.type = NET_LEAVING;
-    net_leaving.new_address = node->successor_ip_address.s_addr; // it is already in the network order.
-    net_leaving.new_port = node->successor_port; // we need to convert it to the network order.
-
-    char buffer[sizeof(struct NET_LEAVING_PDU)];
-   
+    net_leaving.new_address = node->successor_ip_address.s_addr;
+    net_leaving.new_port = htons(node->successor_port);
 
     int send_leaving_status = send(node->sockfd_d, &net_leaving, sizeof(net_leaving), 0);
-    //printf("Sending NET_LEAVING message to the predecessor\n");
-    if (send_leaving_status == -1){
+    if (send_leaving_status == -1) {
         perror("send failed");
         return 1;
     }
 
-    // now we will close the connection with the predecessor and successor.
     close_connection(node);
     exit(0);
 }
-
+// cargo run --bin client -- --tracker 0.0.0.0:1123 --csv ../../../../TestData/data.csv
 // The Q16 state, where the node will receive the NET_LEAVING message from the leaving node.
-int q16_state(void* n, void* data){
+int q16_state(void* n, void* data) {
     printf("[q16 state]\n");
     Node* node = (Node*)n;
     struct NET_LEAVING_PDU* net_leaving = (struct NET_LEAVING_PDU*)data;
@@ -280,65 +247,36 @@ int q16_state(void* n, void* data){
     printf("Received NET_LEAVING message from the leaving node\n");
     printf("Old successor: %s:%d\n", inet_ntoa(node->successor_ip_address), node->successor_port);
 
-    // Ensure that 'new_address' is in host byte order
-    // If deserialization already converted it, no need to convert again
-    // If not, apply ntohl here
-    // Assuming deserialization handled byte order correctly
-
-    // Prepare 'new_address' in network byte order for inet_ntoa or inet_ntop
     struct in_addr new_successor_addr;
-    new_successor_addr.s_addr = net_leaving->new_address; // Convert to network byte order
+    new_successor_addr.s_addr = net_leaving->new_address;
 
     char ip_str[INET_ADDRSTRLEN];
-    if (inet_ntop(AF_INET, &new_successor_addr, ip_str, sizeof(ip_str)) == NULL) {
-        perror("inet_ntop failed");
-        // Handle error accordingly, possibly return or set a default value
-        strcpy(ip_str, "Invalid IP");
+    inet_ntop(AF_INET, &new_successor_addr, ip_str, sizeof(ip_str));
+    printf("New successor: %s:%d\n", ip_str, ntohs(net_leaving->new_port));
+
+    // Check if the new successor address and port are valid
+    if (new_successor_addr.s_addr == INADDR_NONE || ntohs(net_leaving->new_port) == 0) {
+        printf("Invalid successor address or port. Skipping connection attempt.\n");
+        return 1;
     }
 
-    printf("New successor: %s:%d\n", ip_str, net_leaving->new_port);
-
-    // Close the existing connection with the old successor if it's open
-    if (node->sockfd_b >= 0) {
-        // First, shutdown the socket to stop any further communication
-        if(shutdown(node->sockfd_b, SHUT_RDWR) == -1){
-            perror("shutdown failed");
-            // Depending on requirements, you might choose to continue or handle the error
-        }
-
-        // Then, close the socket to free the file descriptor
-        if(close(node->sockfd_b) == -1){
-            perror("close failed");
-            // Depending on requirements, you might choose to continue or handle the error
-        }
-
-        // Reset the socket file descriptor
-        node->sockfd_b = -1;
-    }
-
-    // Check if the new successor is the current node itself
-    if(net_leaving->new_address == node->public_ip.s_addr && net_leaving->new_port == node->port){
+    if (net_leaving->new_address == node->public_ip.s_addr && ntohs(net_leaving->new_port) == node->port) {
         node->successor_ip_address.s_addr = INADDR_NONE;
         node->successor_port = 0;
         node->sockfd_b = -1;
         printf("Now moving to state 6 as there is no successor.\n");
-    }
-    else {
-        // Set up the sockaddr_in structure for the new successor
+    } else {
         struct sockaddr_in addr = {0};
         addr.sin_family = AF_INET;
-        addr.sin_addr.s_addr = net_leaving->new_address; // Already in network byte order
-        addr.sin_port = htons(net_leaving->new_port);    // Ensure port is in network byte order
+        addr.sin_addr.s_addr = net_leaving->new_address;
+        addr.sin_port = net_leaving->new_port;
 
-        // Create a new socket for the new successor
         node->sockfd_b = socket(AF_INET, SOCK_STREAM, 0);
         if (node->sockfd_b == -1) {
             perror("socket creation failed");
-            // Depending on requirements, handle the failure (e.g., retry, exit, notify)
             return 1;
         }
 
-        // Attempt to connect to the new successor
         int connect_status = connect(node->sockfd_b, (struct sockaddr*)&addr, sizeof(addr));
         if (connect_status == -1) {
             perror("connect failure");
@@ -347,14 +285,15 @@ int q16_state(void* n, void* data){
             return 1;
         }
 
-        // Update the node's successor information
-        node->successor_ip_address.s_addr = net_leaving->new_address;
-        node->successor_port = net_leaving->new_port;
+        node->successor_ip_address = new_successor_addr;
+        node->successor_port = ntohs(net_leaving->new_port);
 
-        printf("Connected to new successor: %s:%d\n", ip_str, net_leaving->new_port);
+        printf("Connected to new successor: %s:%d\n", ip_str, ntohs(net_leaving->new_port));
     }
-     
-     printf("Moving to state 6\n");
-    // Transition to state 6
+
+    printf("Moving to state 6\n");
+    node->state_handler = state_handlers[STATE_6];
+    node->state_handler(node, NULL);
+
     return 0;
 }
