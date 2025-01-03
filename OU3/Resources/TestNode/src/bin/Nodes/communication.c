@@ -275,7 +275,6 @@ int q13_state(void* n, void* data){
     
     // Move to the next state (q6)
     node->state_handler = state_handlers[STATE_6];
-    free(data);
     node->state_handler(node, NULL);
 
     return 0;
