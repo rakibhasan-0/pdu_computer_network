@@ -14,13 +14,16 @@ static int serialize_net_join(struct NET_JOIN_PDU* pdu, char* buffer){
     memcpy(buffer + offset, &pdu->type, sizeof(pdu->type));
     offset += sizeof(pdu->type);
     memcpy(buffer + offset, &pdu->src_address, sizeof(pdu->src_address));
+    pdu->src_port = htons(pdu->src_port);
     offset += sizeof(pdu->src_address);
     memcpy(buffer + offset, &pdu->src_port, sizeof(pdu->src_port));
+    printf("port in the buffer %d\n", buffer[offset]);
     offset += sizeof(pdu->src_port);
     memcpy(buffer + offset, &pdu->max_span, sizeof(pdu->max_span));
     offset += sizeof(pdu->max_span);
     memcpy(buffer + offset, &pdu->max_address, sizeof(pdu->max_address));
     offset += sizeof(pdu->max_address);
+    pdu->max_port = htons(pdu->max_port);
     memcpy(buffer + offset, &pdu->max_port, sizeof(pdu->max_port));
     offset += sizeof(pdu->max_port);
     return offset;
@@ -121,7 +124,7 @@ int q5_state(void* n, void* data) {
     struct NET_JOIN_RESPONSE_PDU net_join_response = {0};
     net_join_response.type = NET_JOIN_RESPONSE;
     net_join_response.next_address = node->public_ip.s_addr;
-    net_join_response.next_port = htons(node->port);
+    net_join_response.next_port = node->port;
     net_join_response.range_start = successor_start;  // Just for testing purposes
     net_join_response.range_end = successor_end;
 
@@ -172,7 +175,7 @@ int q5_state(void* n, void* data) {
     }
 
     node->predecessor_ip_address.s_addr = predecessor_addr.sin_addr.s_addr; // storing the predecessor's address in network order.
-    node->predecessor_port = ntohs(predecessor_addr.sin_port); // converting the port to the host order.
+    node->predecessor_port = predecessor_addr.sin_port; // converting the port to the host order.
     node->sockfd_d = accept_status;
 
     printf("Accepted new predecessor: %s:%d\n", inet_ntoa(node->predecessor_ip_address),
@@ -201,14 +204,14 @@ int q14_state(void* n, void* data){
     Node* node = (Node*)n;
     struct NET_JOIN_PDU* net_join = (struct NET_JOIN_PDU*)data;
     printf("Forwarding NET_JOIN to the successor...\n");
-    printf("Successor: %s:%d\n", inet_ntoa(node->successor_ip_address), node->successor_port);
+    printf("Successor: %s:%d\n", inet_ntoa(node->successor_ip_address), ntohs(node->successor_port));
 
     // we have to check the byte order of the address and port.
     // we have to convert the address and port the network order.
     net_join->src_address = net_join->src_address;
-    net_join->src_port = htons(net_join->src_port);
+    net_join->src_port = net_join->src_port;
     net_join->max_address = net_join->max_address;
-    net_join->max_port = htons(net_join->max_port);
+    net_join->max_port = net_join->max_port;
     net_join->max_span = net_join->max_span;
 
     // now we will forward the NET_JOIN to the node's successor.
@@ -292,7 +295,7 @@ int q13_state(void* n, void* data){
     struct NET_JOIN_RESPONSE_PDU net_join_response = {0};
     net_join_response.type = NET_JOIN_RESPONSE;
     net_join_response.next_address = node->public_ip.s_addr;
-    net_join_response.next_port = htons(node->port); // htons(node->port); 
+    net_join_response.next_port = node->port; // htons(node->port); 
     net_join_response.range_start = successor_start;
     net_join_response.range_end = successor_end;
 
@@ -310,7 +313,7 @@ int q13_state(void* n, void* data){
     // we are now assining the new successor to the node.
     node->successor_ip_address = addr.sin_addr;
     node->successor_port = net_join->src_port;
-    printf("Updated successor is %s: %d\n", inet_ntoa(node->successor_ip_address), node->successor_port);
+    printf("Updated successor is %s: %d\n", inet_ntoa(node->successor_ip_address), ntohs(node->successor_port));
     printf("The successor's hash range start: %d, end: %d\n", successor_start, successor_end);
 
     // we are about to transfer upper half of the hash range to the successor.
@@ -385,8 +388,10 @@ size_t serialize_net_join_response(const struct NET_JOIN_RESPONSE_PDU* pdu, char
     memcpy(buffer + offset, &pdu->next_address, sizeof(pdu->next_address));
     offset += sizeof(pdu->next_address);
 
-    memcpy(buffer + offset, &pdu->next_port, sizeof(pdu->next_port));
-    offset += sizeof(pdu->next_port);
+    uint16_t tmp_port = htons(pdu->next_port);
+    printf("the port in the buffer net_response %d\n", buffer[offset]);
+    memcpy(buffer + offset, &tmp_port, sizeof(tmp_port));
+    offset += sizeof(tmp_port);
 
     buffer[offset] = pdu->range_start;
     offset += sizeof(pdu->range_start);

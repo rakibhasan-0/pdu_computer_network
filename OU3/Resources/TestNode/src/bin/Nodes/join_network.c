@@ -12,12 +12,17 @@ static int serialize_net_join(struct NET_JOIN_PDU* pdu, char* buffer){
     offset += sizeof(pdu->type);
     memcpy(buffer + offset, &pdu->src_address, sizeof(pdu->src_address));
     offset += sizeof(pdu->src_address);
+
+    pdu->src_port = htons(pdu->src_port);
     memcpy(buffer + offset, &pdu->src_port, sizeof(pdu->src_port));
     offset += sizeof(pdu->src_port);
+
     memcpy(buffer + offset, &pdu->max_span, sizeof(pdu->max_span));
     offset += sizeof(pdu->max_span);
     memcpy(buffer + offset, &pdu->max_address, sizeof(pdu->max_address));
     offset += sizeof(pdu->max_address);
+    
+    pdu->max_port = htons(pdu->max_port);
     memcpy(buffer + offset, &pdu->max_port, sizeof(pdu->max_port));
     offset += sizeof(pdu->max_port);
     return offset;
@@ -68,8 +73,11 @@ int q7_state(void* n, void* data) {
     net_join.type = NET_JOIN;
 
     // As we have already received host order or converted to host order in q3_state
+    printf("if we ntohs the port %d\n", ntohs(node->port));
+    printf("if we htonl the port %d\n", htons(node->port));
+
     net_join.src_address = node->public_ip.s_addr;  
-    net_join.src_port = htons(node->port);
+    net_join.src_port = node->port;
     net_join.max_span = 0;  
     net_join.max_address = 0; // If you have a known address, use htonl() here.
     net_join.max_port = 0;    // If you have a known port, use htons() here.
@@ -114,7 +122,7 @@ int q7_state(void* n, void* data) {
     // IP addresses in node->predecessor_ip_address in network order (direct assignment).
     // now we are storing the predecessor's ip address and port in the node as the host order.
     node->predecessor_ip_address = sender_addr.sin_addr; // we are storing the address 
-    node->predecessor_port = ntohs(sender_addr.sin_port);
+    node->predecessor_port = sender_addr.sin_port;
     node->sockfd_d = accept_status;
     printf("Accepted new predecessor: %s:%d\n", inet_ntoa(node->predecessor_ip_address), node->predecessor_port);
 
@@ -130,7 +138,7 @@ int q7_state(void* n, void* data) {
 
     // --- Allocate a NET_JOIN_RESPONSE_PDU on the heap ---
     struct NET_JOIN_RESPONSE_PDU* net_join_response
-        = malloc(sizeof(struct NET_JOIN_RESPONSE_PDU));
+        = malloc(sizeof(struct NET_JOIN_RESPONSE_PDU)); // we can use stack memory here.
     if (!net_join_response) {
         perror("malloc failed");
         return 1;
@@ -145,6 +153,9 @@ int q7_state(void* n, void* data) {
     node->hash_range_start= net_join_response->range_start;
     node->hash_range_end = net_join_response->range_end;
     node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
+
+    printf("the port from the net join response is %d\n", net_join_response->next_port);
+    printf("the port after being converted to host order %d\n", net_join_response->next_port);
  
     // Move to q8_state
     node->state_handler = state_handlers[STATE_8];
@@ -164,7 +175,11 @@ int q8_state(void* n, void* data) {
     struct sockaddr_in addr = {0};
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = net_join_response->next_address;
-    addr.sin_port = htons(net_join_response->next_port);
+    addr.sin_port = ntohs(net_join_response->next_port);
+
+    printf("Connecting to the successor...\n");
+    printf("The address of the successor is %s\n", inet_ntoa(addr.sin_addr));
+    printf("The port of the successor is %d\n", ntohs(addr.sin_port));
 
     node->sockfd_b = socket(AF_INET, SOCK_STREAM, 0);
     if (node->sockfd_b == -1) {
@@ -173,6 +188,8 @@ int q8_state(void* n, void* data) {
         return 1;
     }
 
+    printf("the address of the successor is %s\n", inet_ntoa(addr.sin_addr));
+    printf("the port of the successor is %d\n", ntohs(addr.sin_port));
     if (connect(node->sockfd_b, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         perror("connect failure");
         free(net_join_response);

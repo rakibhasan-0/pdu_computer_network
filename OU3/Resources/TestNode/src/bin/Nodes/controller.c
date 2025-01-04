@@ -286,10 +286,10 @@ void deserialize_net_join(struct NET_JOIN_PDU* net_join, const char* buffer){
 
     memcpy(&net_join->src_port, buffer + offset, sizeof(uint16_t));
     // before we convert the port to the host order, we have to increment the offset.
-    printf("before the conversion of the port %d\n", net_join->src_port);
+    printf("before ntohs: raw port = %u\n", (unsigned)net_join->src_port); 
     net_join->src_port = ntohs(net_join->src_port);
-    printf("after the conversion of the port %d\n", net_join->src_port);
-    
+    printf("after ntohs: port = %u\n", (unsigned)net_join->src_port);
+
     offset += sizeof(uint16_t);
 
     net_join->max_span = (uint8_t) buffer[offset];
@@ -346,7 +346,7 @@ static void manage_pdu(Node* node, PDU* pdu){
             break;
         case NET_JOIN:
             // we will convert the fields to the host order.
-            struct NET_JOIN_PDU* net_join = malloc(sizeof(struct NET_JOIN_PDU));
+            struct NET_JOIN_PDU net_join;
                 
             printf("NET_JOIN PDU raw buffer (size=%zd):\n", pdu->size);
             for (size_t i = 0; i < sizeof(net_join); i++) {
@@ -355,11 +355,11 @@ static void manage_pdu(Node* node, PDU* pdu){
             printf("\n");
             // now we will deserialize the net_join
 
-            deserialize_net_join(net_join, pdu->buffer);
-            
+            deserialize_net_join(&net_join, pdu->buffer);
+            printf("the port about to be send%d\n", net_join.src_port);
 
             node->state_handler = state_handlers[STATE_12];
-            node->state_handler(node, net_join);
+            node->state_handler(node, &net_join);
             break;
         case NET_CLOSE_CONNECTION:
             node->state_handler = state_handlers[STATE_17];
