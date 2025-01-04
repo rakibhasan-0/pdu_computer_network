@@ -1,7 +1,29 @@
 #include "join_network.h"
 
 // state number 4, we dont know anything about this state yet.
-// 
+
+
+static int serialize_net_join(struct NET_JOIN_PDU* pdu, char* buffer);
+static void deserialize_net_join_response(struct NET_JOIN_RESPONSE_PDU* pdu, const char* buffer);
+
+static int serialize_net_join(struct NET_JOIN_PDU* pdu, char* buffer){
+    size_t offset = 0;
+    memcpy(buffer + offset, &pdu->type, sizeof(pdu->type));
+    offset += sizeof(pdu->type);
+    memcpy(buffer + offset, &pdu->src_address, sizeof(pdu->src_address));
+    offset += sizeof(pdu->src_address);
+    memcpy(buffer + offset, &pdu->src_port, sizeof(pdu->src_port));
+    offset += sizeof(pdu->src_port);
+    memcpy(buffer + offset, &pdu->max_span, sizeof(pdu->max_span));
+    offset += sizeof(pdu->max_span);
+    memcpy(buffer + offset, &pdu->max_address, sizeof(pdu->max_address));
+    offset += sizeof(pdu->max_address);
+    memcpy(buffer + offset, &pdu->max_port, sizeof(pdu->max_port));
+    offset += sizeof(pdu->max_port);
+    return offset;
+}
+
+
 int q4_state(void* n, void* data){
 
     Node* node = (Node*)n;
@@ -52,6 +74,11 @@ int q7_state(void* n, void* data) {
     net_join.max_address = 0; // If you have a known address, use htonl() here.
     net_join.max_port = 0;    // If you have a known port, use htons() here.
 
+    // we will seraialize the NET_JOIN_PDU
+    char buffer[sizeof(struct NET_JOIN_PDU)];
+    memset(buffer, 0, sizeof(buffer));
+    size_t bytes_to_be_send = serialize_net_join(&net_join, buffer);
+
     // Prepare to send to the node given by net_get_node_response
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
@@ -60,7 +87,7 @@ int q7_state(void* n, void* data) {
     addr.sin_port = htons(net_get_node_response->port);
 
     // Send the NET_JOIN message (UDP )
-    ssize_t bytes_sent = sendto(node->sockfd_a, &net_join, sizeof(net_join), 0, (struct sockaddr *)&addr, sizeof(addr));
+    ssize_t bytes_sent = sendto(node->sockfd_a, buffer, bytes_to_be_send, 0, (struct sockaddr*)&addr, sizeof(addr));
     if (bytes_sent == -1) {
         perror("sendto failed");
         return 1;
@@ -92,31 +119,34 @@ int q7_state(void* n, void* data) {
     printf("Accepted new predecessor: %s:%d\n", inet_ntoa(node->predecessor_ip_address), node->predecessor_port);
 
     // Receive the NET_JOIN_RESPONSE_PDU from predecessor
-    struct NET_JOIN_RESPONSE_PDU* net_join_response = malloc(sizeof(struct NET_JOIN_RESPONSE_PDU));
-    memset(net_join_response, 0, sizeof(struct NET_JOIN_RESPONSE_PDU));
+    char buffer_net_join_response[sizeof(struct NET_JOIN_RESPONSE_PDU)];
+    memset(buffer_net_join_response, 0, sizeof(buffer_net_join_response));
 
-    int recv_status = recv(accept_status, net_join_response, sizeof(*net_join_response), 0);
+    ssize_t recv_status = recv(accept_status, buffer_net_join_response, sizeof(buffer_net_join_response), 0);
     if (recv_status == -1) {
         perror("recv failed");
         return 1;
+    } 
+
+    // --- Allocate a NET_JOIN_RESPONSE_PDU on the heap ---
+    struct NET_JOIN_RESPONSE_PDU* net_join_response
+        = malloc(sizeof(struct NET_JOIN_RESPONSE_PDU));
+    if (!net_join_response) {
+        perror("malloc failed");
+        return 1;
     }
-    // Converting all fields in NET_JOIN_RESPONSE_PDU to host order...
-    net_join_response->next_address = net_join_response->next_address; // we are not converting the address to the host order, kept the network order, it is very unusual!!
-    net_join_response->next_port = ntohs(net_join_response->next_port);
-    net_join_response->range_start = net_join_response->range_start;
-    net_join_response->range_end = net_join_response->range_end;
+    memset(net_join_response, 0, sizeof(*net_join_response));
 
-
+    // --- Deserialize into the struct ---
+    deserialize_net_join_response(net_join_response, buffer_net_join_response);
+    printf("the net join response port is %d\n", net_join_response->next_port);
 
     printf("Received NET_JOIN_RESPONSE from predecessor\n");
-    // we are updating the hash range of the node.
-    node->hash_range_start = net_join_response->range_start;
+    node->hash_range_start= net_join_response->range_start;
     node->hash_range_end = net_join_response->range_end;
     node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
-    printf("Node's updated range: (%d, %d)\n", node->hash_range_start, node->hash_range_end);
-    printf("Node's updated hash range: %d\n", node->hash_span);
-
-    // Move to q8_state to connect to the successor
+ 
+    // Move to q8_state
     node->state_handler = state_handlers[STATE_8];
     node->state_handler(node, net_join_response);
 
@@ -160,3 +190,20 @@ int q8_state(void* n, void* data) {
 
     return 0;
 }
+
+static void deserialize_net_join_response(struct NET_JOIN_RESPONSE_PDU* pdu, const char* buffer){
+    printf("Deserializing NET_JOIN_RESPONSE_PDU\n");
+    size_t offset = 0;
+    pdu->type = buffer[offset];
+    offset += sizeof(pdu->type);
+    memcpy(&pdu->next_address, buffer + offset, sizeof(pdu->next_address));
+    offset += sizeof(pdu->next_address);
+    memcpy(&pdu->next_port, buffer + offset, sizeof(pdu->next_port));
+    offset += sizeof(pdu->next_port);
+    pdu->next_port = ntohs(pdu->next_port);
+    pdu->range_start = buffer[offset];
+    offset += sizeof(pdu->range_start);
+    pdu->range_end = buffer[offset];
+    offset += sizeof(pdu->range_end);
+}
+

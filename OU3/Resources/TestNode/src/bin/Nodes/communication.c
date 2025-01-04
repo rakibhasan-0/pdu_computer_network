@@ -2,6 +2,30 @@
 #include "communication.h"
 
 
+size_t serialize_net_join_response(const struct NET_JOIN_RESPONSE_PDU* pdu, char* buffer);
+size_t serialize_net_close_connection(const struct NET_CLOSE_CONNECTION_PDU* pdu, char* buffer);
+static int serialize_net_join(struct NET_JOIN_PDU* pdu, char* buffer);
+
+
+
+
+static int serialize_net_join(struct NET_JOIN_PDU* pdu, char* buffer){
+    size_t offset = 0;
+    memcpy(buffer + offset, &pdu->type, sizeof(pdu->type));
+    offset += sizeof(pdu->type);
+    memcpy(buffer + offset, &pdu->src_address, sizeof(pdu->src_address));
+    offset += sizeof(pdu->src_address);
+    memcpy(buffer + offset, &pdu->src_port, sizeof(pdu->src_port));
+    offset += sizeof(pdu->src_port);
+    memcpy(buffer + offset, &pdu->max_span, sizeof(pdu->max_span));
+    offset += sizeof(pdu->max_span);
+    memcpy(buffer + offset, &pdu->max_address, sizeof(pdu->max_address));
+    offset += sizeof(pdu->max_address);
+    memcpy(buffer + offset, &pdu->max_port, sizeof(pdu->max_port));
+    offset += sizeof(pdu->max_port);
+    return offset;
+}
+
 // that function will calculate the hash span of the node and its successor.
 static void split_range(Node *n, uint8_t *successor_start, uint8_t *successor_end){
 
@@ -120,8 +144,10 @@ int q5_state(void* n, void* data) {
     }
 
     //printf("Connected to the new successor: %s:%d\n", inet_ntoa(addr.sin_addr), ntohs(addr.sin_port));
+    char net_join_response_buffer[sizeof(net_join_response)];
+    size_t bytes_to_send_net_join = serialize_net_join_response(&net_join_response, net_join_response_buffer);
 
-    int send_status = send(node->sockfd_b, &net_join_response, sizeof(net_join_response), 0);
+    int send_status = send(node->sockfd_b, net_join_response_buffer, bytes_to_send_net_join, 0);
     if (send_status == -1) {
         perror("send failure");
         return 1;
@@ -160,7 +186,13 @@ int q5_state(void* n, void* data) {
     return 0;
 }
 
-
+size_t serialize_net_close_connection(const struct NET_CLOSE_CONNECTION_PDU* pdu, char* buffer){
+    size_t offset = 0;
+    memcpy(buffer + offset, &pdu->type, sizeof(pdu->type));
+    offset += sizeof(pdu->type);
+    return offset;
+    
+}
 
 // we will forward the NET_JOIN to the node's successor.
 int q14_state(void* n, void* data){
@@ -180,7 +212,12 @@ int q14_state(void* n, void* data){
     net_join->max_span = net_join->max_span;
 
     // now we will forward the NET_JOIN to the node's successor.
-    int send_status = send(node->sockfd_b, net_join, sizeof(*net_join), 0);
+    char net_join_buffer[sizeof(struct NET_JOIN_PDU)];
+    size_t bytes_to_send_net_join = serialize_net_join(net_join, net_join_buffer);
+    printf("the size of the net join structure is %d\n", sizeof(struct NET_JOIN_PDU));
+    printf("the size of the net join buffer is %d\n", bytes_to_send_net_join);
+
+    int send_status = send(node->sockfd_b, net_join_buffer, bytes_to_send_net_join, 0);
     if (send_status == -1) {
         perror("send failure");
         return 1;
@@ -204,14 +241,17 @@ int q13_state(void* n, void* data){
     struct NET_JOIN_PDU* net_join = (struct NET_JOIN_PDU*)data;
 
     // Prepare the NET_CLOSE_CONNECTION PDU so that the successor can close the connection with the current node.
-    struct NET_CLOSE_CONNECTION_PDU net_close_connection = {0};
+    struct NET_CLOSE_CONNECTION_PDU net_close_connection;
     net_close_connection.type = NET_CLOSE_CONNECTION;
+    char net_close_connection_buffer[sizeof(net_close_connection)];
+    int net_close_connection_size = serialize_net_close_connection(&net_close_connection, net_close_connection_buffer);
+
     printf("Sending NET_CLOSE_CONNECTION to the current successor...\n");
     // I think we shall close the file descriptor that is connected to the successor.
     // I mean close the socket that is connected to the successor.
 
     // Send the NET_CLOSE_CONNECTION PDU to the successor
-    int send_status = send(node->sockfd_b, &net_close_connection, sizeof(net_close_connection), 0);
+    int send_status = send(node->sockfd_b, net_close_connection_buffer, net_close_connection_size, 0);
     if (send_status == -1) {
         perror("send failure");
         return 1;
@@ -251,14 +291,17 @@ int q13_state(void* n, void* data){
     // Prepare the NET_JOIN_RESPONSE PDU    
     struct NET_JOIN_RESPONSE_PDU net_join_response = {0};
     net_join_response.type = NET_JOIN_RESPONSE;
-    net_join_response.next_address = node->successor_ip_address.s_addr; // the address is already in the network order.
-    net_join_response.next_port = htons(node->successor_port); // we need to change the order since it was in the host order.
-    net_join_response.range_start = successor_start; // it will be the new node's start range, it is just 8 bits
-    net_join_response.range_end =  successor_end; // same, it will be the new node's end range.
+    net_join_response.next_address = node->public_ip.s_addr;
+    net_join_response.next_port = htons(node->port); // htons(node->port); 
+    net_join_response.range_start = successor_start;
+    net_join_response.range_end = successor_end;
+
+    char net_join_response_buffer[sizeof(net_join_response)];
+    size_t bytes_to_send_net_join = serialize_net_join_response(&net_join_response, net_join_response_buffer);
 
 
     // Send the NET_JOIN_RESPONSE PDU to the successor aka to the prospect.
-    send_status = send(node->sockfd_b, &net_join_response, sizeof(net_join_response), 0);
+    send_status = send(node->sockfd_b, net_join_response_buffer, bytes_to_send_net_join, 0);
     if (send_status == -1) {
         perror("send failure");
         return 1;
@@ -332,4 +375,24 @@ int q17_state(void* n, void* data) {
 
 
     return 0;
+}
+
+size_t serialize_net_join_response(const struct NET_JOIN_RESPONSE_PDU* pdu, char* buffer){
+    size_t offset = 0;
+    buffer[offset] = pdu->type;
+    offset += sizeof(pdu->type);
+
+    memcpy(buffer + offset, &pdu->next_address, sizeof(pdu->next_address));
+    offset += sizeof(pdu->next_address);
+
+    memcpy(buffer + offset, &pdu->next_port, sizeof(pdu->next_port));
+    offset += sizeof(pdu->next_port);
+
+    buffer[offset] = pdu->range_start;
+    offset += sizeof(pdu->range_start);
+
+    buffer[offset] = pdu->range_end;
+    offset += sizeof(pdu->range_end);
+
+    return offset;
 }
