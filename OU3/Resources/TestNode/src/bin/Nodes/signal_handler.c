@@ -15,6 +15,18 @@ size_t construct_net_new_range(struct NET_NEW_RANGE_PDU* pdu, char* buffer, Node
 
 }
 
+size_t serialize_net_leaving (const struct NET_LEAVING_PDU* pdu, char* buffer){
+    size_t offset = 0;
+    buffer[offset++] = pdu->type; // 1 byte
+
+    memcpy(buffer + offset, &pdu->new_address, sizeof(pdu->new_address));
+    offset += sizeof(pdu->new_address); // 4 bytes
+
+    uint16_t new_port = htons(pdu->new_port);
+    memcpy(buffer + offset, &new_port, sizeof(new_port));
+    offset += sizeof(new_port); // 2 bytes
+    return offset;
+}
 
 
 
@@ -48,6 +60,9 @@ static void close_connection (Node* node){
             perror("close sockfd_d failed");
         }
     }
+
+    // we may need to deallocate the memory here.
+    destroy_allocated_memory(node);
 
 }
 
@@ -205,9 +220,11 @@ int q15_state(void* n, void* data) {
 
         struct NET_NEW_RANGE_RESPONSE_PDU net_new_range_response = {0};
         net_new_range_response.type = NET_NEW_RANGE_RESPONSE;
+        char new_range_response_buffer[sizeof(struct NET_NEW_RANGE_RESPONSE_PDU)];
+        new_range_response_buffer[0] = net_new_range_response.type;
 
         //printf("The predecessor is %s:%d\n", inet_ntoa(node->predecessor_ip_address), node->predecessor_port);
-        int send_status = send(node->sockfd_d, &net_new_range_response, sizeof(net_new_range_response), 0);
+        int send_status = send(node->sockfd_d, new_range_response_buffer, sizeof(net_new_range_response), 0);
         if (send_status == -1) {
             perror("Send failed");
             return 1;
@@ -241,8 +258,12 @@ int q18_state(void* n, void* data){
     // now we will send NET_CLOSE_CONNECTION message to the successor.
     struct NET_CLOSE_CONNECTION_PDU net_close_connection = {0};
     net_close_connection.type = NET_CLOSE_CONNECTION;
-    int send_status = send(node->sockfd_b, &net_close_connection, sizeof(net_close_connection), 0);
-    //printf("Sending NET_CLOSE_CONNECTION message to the successor\n");
+    // serialize the net_close_connection to the buffer.
+    char buffer_net_close[sizeof(struct NET_CLOSE_CONNECTION_PDU)];
+    buffer_net_close[0] = net_close_connection.type;
+
+    int send_status = send(node->sockfd_b, buffer_net_close, sizeof(buffer_net_close), 0);
+    printf("Sending NET_CLOSE_CONNECTION message to the successor\n");
     if (send_status == -1){
         perror("send failed");
         return 1;
@@ -255,16 +276,20 @@ int q18_state(void* n, void* data){
     net_leaving.type = NET_LEAVING;
     net_leaving.new_address = node->successor_ip_address.s_addr; // it is already in the network order.
     net_leaving.new_port = node->successor_port; // we need to convert it to the network order.
+    // here we will add the net_leaving to the buffer to seralize it.
+    char net_leaving_buffer [sizeof(struct NET_LEAVING_PDU)];
+    memset(net_leaving_buffer, 0, sizeof(net_leaving_buffer));
 
-    char buffer[sizeof(struct NET_LEAVING_PDU)];
-   
-
-    int send_leaving_status = send(node->sockfd_d, &net_leaving, sizeof(net_leaving), 0);
-    //printf("Sending NET_LEAVING message to the predecessor\n");
+    int bytes_to_send = serialize_net_leaving(&net_leaving, net_leaving_buffer);
+    int send_leaving_status = send(node->sockfd_d, net_leaving_buffer, bytes_to_send, 0);
+    
+    printf("Sending NET_LEAVING message to the predecessor\n");
     if (send_leaving_status == -1){
         perror("send failed");
         return 1;
     }
+
+    printf("Exiting...\n");
 
     // now we will close the connection with the predecessor and successor.
     close_connection(node);

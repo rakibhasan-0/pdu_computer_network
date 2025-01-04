@@ -76,9 +76,9 @@ queue_t* queue_create(int capacity) {
  */
 bool queue_is_empty(queue_t* q) {
     bool empty;
-    pthread_mutex_lock(&q->lock);
+    //pthread_mutex_lock(&q->lock);
     empty = (q->size == 0);
-    pthread_mutex_unlock(&q->lock);
+    //pthread_mutex_unlock(&q->lock);
     return empty;
 }
 
@@ -94,7 +94,7 @@ void queue_enqueue(queue_t* q, void* item) {
         return;
     }
 
-    pthread_mutex_lock(&q->lock);
+    //pthread_mutex_lock(&q->lock);
 
     // Resize if the queue is full
     if (q->size == q->capacity) {
@@ -106,7 +106,15 @@ void queue_enqueue(queue_t* q, void* item) {
     q->items[q->rear] = item;
     q->size++;
 
-    pthread_mutex_unlock(&q->lock);
+    //pthread_mutex_unlock(&q->lock);
+}
+
+void clean_up_queue(queue_t* q){
+
+   for(int i = 0; i < q->size; i++){
+       free(q->items[i]);
+   }
+    
 }
 
 /**
@@ -116,7 +124,7 @@ void queue_enqueue(queue_t* q, void* item) {
  * @return Pointer to the dequeued item, or NULL if the queue is empty.
  */
 void* queue_dequeue(queue_t* q) {
-    pthread_mutex_lock(&q->lock);
+   // pthread_mutex_lock(&q->lock);
 
     if (q->size == 0) {
         fprintf(stderr, "Queue is empty. Cannot dequeue.\n");
@@ -128,7 +136,7 @@ void* queue_dequeue(queue_t* q) {
     q->front = (q->front + 1) % q->capacity;
     q->size--;
 
-    pthread_mutex_unlock(&q->lock);
+    //pthread_mutex_unlock(&q->lock);
     return item;
 }
 
@@ -140,9 +148,9 @@ void* queue_dequeue(queue_t* q) {
  */
 int queue_size(queue_t* q) {
     int size;
-    pthread_mutex_lock(&q->lock);
+    //pthread_mutex_lock(&q->lock);
     size = q->size;
-    pthread_mutex_unlock(&q->lock);
+    //pthread_mutex_unlock(&q->lock);
     return size;
 }
 
@@ -154,8 +162,8 @@ int queue_size(queue_t* q) {
 void queue_destroy(queue_t* q) {
     if (q == NULL) return;
 
-    pthread_mutex_lock(&q->lock);
-
+    //pthread_mutex_lock(&q->lock);
+    clean_up_queue(q);
     free(q->items);
     q->items = NULL;
     q->front = 0;
@@ -163,7 +171,7 @@ void queue_destroy(queue_t* q) {
     q->size = 0;
     q->capacity = 0;
 
-    pthread_mutex_unlock(&q->lock);
+    //pthread_mutex_unlock(&q->lock);
 
     pthread_mutex_destroy(&q->lock);
     free(q);

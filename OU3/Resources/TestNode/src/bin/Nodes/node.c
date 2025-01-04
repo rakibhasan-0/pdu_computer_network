@@ -22,12 +22,8 @@ state_handler state_handlers[] = {
     q9_state, // 17
 };
 
-/*
-Steps:
--Implement sockets
--STUN_LOOKUP in order to test communication with the tracker
-*/
 
+void free_entry(void* entry);
 volatile sig_atomic_t should_close = 0; // creaeting should_close as a global variable, initially it is set to 0 as false.
 
 int main(int argc, char* argv[]) {
@@ -48,7 +44,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    node->hash_table = ht_create(NULL); // we are creating the hash table.
+    node->hash_table = ht_create(free_entry); // we are creating the hash table.
     register_signal_handlers(); // we are about to register the signal handlers.
     node->queue = queue_create(10); // we are creating the queue for the values.
 
@@ -67,17 +63,18 @@ int main(int argc, char* argv[]) {
 
     node->tracker_port = atoi(argv[2]);
     node->tracker_addr = res;
-    node->state_handler = state_handlers[0]; // we are initializing the function pointer to point to the q1 state.
+    node->state_handler = state_handlers[STATE_1]; // we are initializing the function pointer to point to the q1 state.
     node->state_handler(node, NULL); // now we are incoking the function by using the function pointer.
-
-
-
-    freeaddrinfo(node->tracker_addr);
-    close(node->sockfd_a);
-    free(node);
-
+    
     return 0;
 }
 
+void free_entry(void* entry) {
+    Entry* e = (Entry*)entry;
+    free(e->ssn);
+    free(e->name);
+    free(e->email);
+    free(e);
+}
 
 

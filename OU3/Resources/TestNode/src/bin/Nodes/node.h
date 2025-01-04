@@ -44,6 +44,11 @@
 #define STATE_18 15
 #define STATE_16 16
 #define STATE_9 17
+#define STATE_7 6
+#define STATE_4 3
+#define STATE_3 2
+#define STATE_2 1
+#define STATE_1 0
 
 typedef struct Node Node;
 

@@ -144,7 +144,7 @@ int q3_state(void* n, void* data){
     }
 
     // net_get_node_response will store the response from the tracker
-    struct NET_GET_NODE_RESPONSE_PDU* net_get_node_response = calloc(1, sizeof(struct NET_GET_NODE_RESPONSE_PDU)); // as we are senfing to the other function.
+    struct NET_GET_NODE_RESPONSE_PDU* net_get_node_response = malloc(sizeof(struct NET_GET_NODE_RESPONSE_PDU)); // as we are senfing to the other function.
     // we will create a buffer to store the response from the tracker
     char buffer[1024];
     memset(buffer, 0, sizeof(buffer));
@@ -173,6 +173,7 @@ int q3_state(void* n, void* data){
         if (net_get_node_response->address == 0 && net_get_node_response->port == 0){
             printf("Empty response\n");
             printf("I am the first node to join the network\n");
+            free(net_get_node_response);
             node-> state_handler = state_handlers[3];
             node->state_handler(node, NULL);
         }else{
@@ -180,7 +181,7 @@ int q3_state(void* n, void* data){
             // what I guess that net_get_node_response will contain the information about a node in the network.
             // it will contain the address and the port of the node.
             // the main task of the 
-            node->state_handler = state_handlers[6]; // now we are going to the q7 state.
+            node->state_handler = state_handlers[STATE_7]; // now we are going to the q7 state.
             node->state_handler(node, net_get_node_response);
         }
 
