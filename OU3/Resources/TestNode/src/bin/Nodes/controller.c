@@ -380,89 +380,89 @@ ssize_t get_packet_size(uint8_t pdu_type, const char *buffer, size_t buffer_fill
 
     switch (pdu_type){
 
-    case NET_ALIVE:
-        // total byes of the NET_ALIVE_PDU
-        return 1;
+        case NET_ALIVE:
+            // total byes of the NET_ALIVE_PDU
+            return 1;
 
-    case NET_GET_NODE:
-        // total 1 bytes
-        return 1;
+        case NET_GET_NODE:
+            // total 1 bytes
+            return 1;
 
-    case NET_GET_NODE_RESPONSE:
-        return 1 + 4 + 2;
+        case NET_GET_NODE_RESPONSE:
+            return 1 + 4 + 2;
 
-    case NET_JOIN:
-        return 1 + 4 + 2 + 1 + 4 + 2;
+        case NET_JOIN:
+            return 1 + 4 + 2 + 1 + 4 + 2;
 
-    case NET_JOIN_RESPONSE:
-        return 1+ 4 + 2 + 1+ 1;
+        case NET_JOIN_RESPONSE:
+            return 1+ 4 + 2 + 1+ 1;
 
-    case NET_CLOSE_CONNECTION:
-        return 1;
+        case NET_CLOSE_CONNECTION:
+            return 1;
 
-    case NET_NEW_RANGE:
-        return 1+ 1 + 1;
+        case NET_NEW_RANGE:
+            return 1+ 1 + 1;
 
-    case NET_NEW_RANGE_RESPONSE:
-        return 1;
+        case NET_NEW_RANGE_RESPONSE:
+            return 1;
 
-    case NET_LEAVING:
-        return 1 + 4 + 2;
+        case NET_LEAVING:
+            return 1 + 4 + 2;
 
-    case VAL_REMOVE:
-        if(buffer_fill < 13){
+        case VAL_REMOVE:
+            if(buffer_fill < 13){
+                return -1;
+            }
+            return 1 + 12;
+
+        case VAL_LOOKUP:
+            if(buffer_fill < 19){
+                return -1;
+            }
+            return 19;
+
+        case VAL_LOOKUP_RESPONSE:{
+
+            if (buffer_fill < 14){              
+                // 1 (TYPE) + 12 (SSN) + 1 (NAME_LENGTH)
+                return -1; // Insufficient data
+            }
+
+            uint8_t name_length = buffer[13];
+            if (buffer_fill < 14 + name_length + 1){              
+                // +1 for EMAIL_LENGTH
+                return -1; // Insufficient data
+            }
+
+            uint8_t email_length = buffer[14 + name_length];
+            return 1 + 12 + 1 + name_length + 1 + email_length;
+        }
+
+        case VAL_INSERT:{
+
+            if (buffer_fill < 14){              
+                // 1 (TYPE) + 12 (SSN) + 1 (NAME_LENGTH)
+                return -1; // Insufficient data
+            }
+
+            uint8_t name_length = buffer[13];
+            if (buffer_fill < 14 + name_length + 1){
+                // +1 for EMAIL_LENGTH
+                return -1; // Insufficient data
+            }
+
+            uint8_t email_length = buffer[14 + name_length];
+            return 1 + 12 + 1 + name_length + 1 + email_length;
+
+        }
+
+        case STUN_LOOKUP:
+            return sizeof(struct STUN_LOOKUP_PDU);
+
+        case STUN_RESPONSE:
+            return sizeof(struct STUN_RESPONSE_PDU);
+        default:
             return -1;
-        }
-        return 1 + 12;
-
-    case VAL_LOOKUP:
-        if(buffer_fill < 19){
-            return -1;
-        }
-        return 19;
-
-    case VAL_LOOKUP_RESPONSE:{
-
-        if (buffer_fill < 14){              
-            // 1 (TYPE) + 12 (SSN) + 1 (NAME_LENGTH)
-            return -1; // Insufficient data
-        }
-
-        uint8_t name_length = buffer[13];
-        if (buffer_fill < 14 + name_length + 1){              
-            // +1 for EMAIL_LENGTH
-            return -1; // Insufficient data
-        }
-
-        uint8_t email_length = buffer[14 + name_length];
-        return 1 + 12 + 1 + name_length + 1 + email_length;
-    }
-
-    case VAL_INSERT:{
-
-        if (buffer_fill < 14){              
-            // 1 (TYPE) + 12 (SSN) + 1 (NAME_LENGTH)
-            return -1; // Insufficient data
-        }
-
-        uint8_t name_length = buffer[13];
-        if (buffer_fill < 14 + name_length + 1){
-            // +1 for EMAIL_LENGTH
-            return -1; // Insufficient data
-        }
-
-        uint8_t email_length = buffer[14 + name_length];
-        return 1 + 12 + 1 + name_length + 1 + email_length;
-
-    }
-
-    case STUN_LOOKUP:
-        return sizeof(struct STUN_LOOKUP_PDU);
-
-    case STUN_RESPONSE:
-        return sizeof(struct STUN_RESPONSE_PDU);
-    default:
-        return -1;
     }
 }
 
@@ -477,21 +477,17 @@ void deserialize_net_new_range(struct NET_NEW_RANGE_PDU* net_join , char* pdu){
 
 void deserialize_net_leave(struct NET_LEAVING_PDU* net_leave, const char* buffer, size_t buffer_size){
 
-    if(buffer_size < sizeof(struct NET_LEAVING_PDU)){
-        return;
-    }
-
+  
     size_t offset = 0;
-
-    net_leave->type = buffer[offset];
-    offset += 4;
-
+    net_leave->type = buffer[offset++];
     memcpy(&net_leave->new_address, buffer + offset, sizeof(uint32_t));
-
-    offset += 4;
+    offset += sizeof(uint32_t);
+    // we shall have the port number in the host order.
     memcpy(&net_leave->new_port, buffer + offset, sizeof(uint16_t));
+    net_leave->new_port = ntohs(net_leave->new_port);
+    offset += sizeof(uint16_t);
 
-    printf("NET_LEAVING_PDU: type=%u, new_address=%u, new_port=%u\n", net_leave->type, net_leave->new_address, ntohs(net_leave->new_port));
-
+    return;
+    
 
 }
