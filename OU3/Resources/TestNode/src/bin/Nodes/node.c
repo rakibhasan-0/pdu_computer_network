@@ -68,6 +68,7 @@ int main(int argc, char* argv[]) {
 	//printf("Meme test\n");
 	//queue_destroy(node->queue);
     //freeaddrinfo(node->tracker_addr);
+	destroy_allocated_memory(node);
     return 0;
 }
 

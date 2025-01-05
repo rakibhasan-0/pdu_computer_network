@@ -199,7 +199,8 @@ int q8_state(void* n, void* data) {
 
     node->successor_ip_address = addr.sin_addr;
     node->successor_port = net_join_response->next_port;
-
+	
+	printf("Freeing net_join_response in join_network.c\n");
     free(net_join_response);
 
     node->state_handler = state_handlers[STATE_6];

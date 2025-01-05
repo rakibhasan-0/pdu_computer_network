@@ -280,6 +280,7 @@ int q18_state(void* n, void* data){
 
     // now we will close the connection with the predecessor and successor.
     close_connection(node);
+	printf("Meme test33\n");
     exit(0);
 }
 
@@ -292,65 +293,44 @@ int q16_state(void* n, void* data){
     printf("Received NET_LEAVING message from the leaving node\n");
     printf("Old successor: %s:%d\n", inet_ntoa(node->successor_ip_address), node->successor_port);
 
-    // Ensure that 'new_address' is in host byte order
-    // If deserialization already converted it, no need to convert again
-    // If not, apply ntohl here
-    // Assuming deserialization handled byte order correctly
-
-    // Prepare 'new_address' in network byte order for inet_ntoa or inet_ntop
     struct in_addr new_successor_addr;
-    new_successor_addr.s_addr = net_leaving->new_address; // Convert to network byte order
+    new_successor_addr.s_addr = net_leaving->new_address;
 
     char ip_str[INET_ADDRSTRLEN];
     if (inet_ntop(AF_INET, &new_successor_addr, ip_str, sizeof(ip_str)) == NULL) {
         perror("inet_ntop failed");
-        // Handle error accordingly, possibly return or set a default value
         strcpy(ip_str, "Invalid IP");
     }
 
     printf("New successor: %s:%d\n", ip_str, net_leaving->new_port);
 
-    // Close the existing connection with the old successor if it's open
     if (node->sockfd_b >= 0) {
-        // First, shutdown the socket to stop any further communication
         if(shutdown(node->sockfd_b, SHUT_RDWR) == -1){
             perror("shutdown failed");
-            // Depending on requirements, you might choose to continue or handle the error
         }
-
-        // Then, close the socket to free the file descriptor
         if(close(node->sockfd_b) == -1){
             perror("close failed");
-            // Depending on requirements, you might choose to continue or handle the error
         }
-
-        // Reset the socket file descriptor
         node->sockfd_b = -1;
     }
 
-    // Check if the new successor is the current node itself
     if(net_leaving->new_address == node->public_ip.s_addr && net_leaving->new_port == node->port){
         node->successor_ip_address.s_addr = INADDR_NONE;
         node->successor_port = 0;
         node->sockfd_b = -1;
         printf("Now moving to state 6 as there is no successor.\n");
-    }
-    else {
-        // Set up the sockaddr_in structure for the new successor
+    } else {
         struct sockaddr_in addr = {0};
         addr.sin_family = AF_INET;
-        addr.sin_addr.s_addr = net_leaving->new_address; // Already in network byte order
-        addr.sin_port = htons(net_leaving->new_port);    // Ensure port is in network byte order
+        addr.sin_addr.s_addr = net_leaving->new_address;
+        addr.sin_port = htons(net_leaving->new_port);
 
-        // Create a new socket for the new successor
         node->sockfd_b = socket(AF_INET, SOCK_STREAM, 0);
         if (node->sockfd_b == -1) {
             perror("socket creation failed");
-            // Depending on requirements, handle the failure (e.g., retry, exit, notify)
             return 1;
         }
 
-        // Attempt to connect to the new successor
         int connect_status = connect(node->sockfd_b, (struct sockaddr*)&addr, sizeof(addr));
         if (connect_status == -1) {
             perror("connect failure");
@@ -359,14 +339,13 @@ int q16_state(void* n, void* data){
             return 1;
         }
 
-        // Update the node's successor information
         node->successor_ip_address.s_addr = net_leaving->new_address;
         node->successor_port = net_leaving->new_port;
 
         printf("Connected to new successor: %s:%d\n", ip_str, net_leaving->new_port);
     }
-     
-     printf("Moving to state 6\n");
-    // Transition to state 6
+
+    printf("Moving to state 6\n");
+
     return 0;
 }

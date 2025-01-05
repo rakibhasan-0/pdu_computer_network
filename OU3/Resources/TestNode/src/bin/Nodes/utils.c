@@ -197,8 +197,7 @@ void destroy_allocated_memory(void* n){
     if(node->queue){
         queue_destroy(node->queue);
     }
-	printf("Meme tes3t\n");
     freeaddrinfo(node->tracker_addr);
-	printf("Meme tes4t\n");
     free(node);
+	printf("Memory destroyed\n");
 }
