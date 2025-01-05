@@ -13,5 +13,4 @@
 
 
 int q6_state(void* n, void* data);
-
 #endif

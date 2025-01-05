@@ -20,6 +20,7 @@ typedef struct queue {
     int size;                 ///< Current number of items in the queue.
     int capacity;             ///< Current capacity of the queue.
     pthread_mutex_t lock;     ///< Mutex for thread-safe operations.
+	int destroyed;            ///< Flag to indicate if the queue has been destroyed.
 } queue_t;
 
 /**

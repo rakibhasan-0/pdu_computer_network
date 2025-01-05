@@ -147,7 +147,7 @@ static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu) {
 
         //printf("we are about to insert the value\n");
         node->hash_table = ht_insert(node->hash_table, entry->ssn, entry);
-        printf("Value inserted successfully\n");
+        //printf("Value inserted successfully\n");
     } else {
 
         // we will forward the pdu to the successor.
@@ -175,7 +175,7 @@ static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu) {
             perror("send failure");
             return;
         }
-        printf("Forwarding VAL_INSERT to successor\n");
+        //printf("Forwarding VAL_INSERT to successor\n");
 
         free(out_buffer);
 

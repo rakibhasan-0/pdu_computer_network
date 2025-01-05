@@ -13,8 +13,13 @@ static void queue_resize(queue_t* q) {
         exit(EXIT_FAILURE);
     }
 
+    // Initialize new items to NULL
+    for (int i = 0; i < new_capacity; i++) {
+        new_items[i] = NULL;
+    }
+
     // Copy elements to the new buffer in correct order
-    for(int i = 0; i < q->size; i++) {
+    for (int i = 0; i < q->size; i++) {
         new_items[i] = q->items[(q->front + i) % q->capacity];
     }
 
@@ -27,7 +32,6 @@ static void queue_resize(queue_t* q) {
     q->rear = q->size - 1;
     q->capacity = new_capacity;
 }
-
 /**
  * @brief Creates a new queue with the specified initial capacity.
  *
@@ -57,6 +61,7 @@ queue_t* queue_create(int capacity) {
     q->rear = -1;
     q->size = 0;
     q->capacity = capacity;
+    q->destroyed = 0;
 
     if (pthread_mutex_init(&q->lock, NULL) != 0) {
         perror("Failed to initialize mutex for queue");
@@ -65,6 +70,12 @@ queue_t* queue_create(int capacity) {
         exit(EXIT_FAILURE);
     }
 
+    // Initialize all items to NULL
+    for (int i = 0; i < capacity; i++) {
+        q->items[i] = NULL;
+    }
+
+    printf("Queue created with capacity: %d\n", capacity);
     return q;
 }
 
@@ -160,19 +171,30 @@ int queue_size(queue_t* q) {
  * @param q Pointer to the queue.
  */
 void queue_destroy(queue_t* q) {
-    if (q == NULL) return;
+    if (q == NULL || q->destroyed) {
+        return;
+    }
 
-    //pthread_mutex_lock(&q->lock);
-    clean_up_queue(q);
-    free(q->items);
-    q->items = NULL;
-    q->front = 0;
-    q->rear = -1;
-    q->size = 0;
-    q->capacity = 0;
+    q->destroyed = 1; // Set the flag to indicate the queue is destroyed
 
-    //pthread_mutex_unlock(&q->lock);
+    printf("Destroying queue with capacity: %d, size: %d\n", q->capacity, q->size);
+
+    // Free all items in the queue
+    if (q->items != NULL) {
+        /*for (int i = 0; i < q->capacity; i++) {
+            if (q->items[i] != NULL) {
+                //printf("Freeing item at index %d\n", i);
+                //free(q->items[i]);
+                q->items[i] = NULL; // Set to NULL after freeing
+            }
+        }*/
+        printf("Freeing items array\n");
+        free(q->items);
+        q->items = NULL; // Set to NULL after freeing
+    }
 
     pthread_mutex_destroy(&q->lock);
+    printf("Freeing queue structure\n");
     free(q);
 }
+

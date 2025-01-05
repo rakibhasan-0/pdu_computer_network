@@ -4,7 +4,6 @@ uint8_t calulate_hash_span(uint8_t start, uint8_t end){
     return (end - start ) % 256;
 }
 
-
 void update_hash_range(void* n, uint8_t new_range_start, uint8_t new_range_end) {
 
     //printf("Current hash range: [%d, %d)\n", node->hash_range_start, node->hash_range_end);
@@ -22,9 +21,6 @@ void update_hash_range(void* n, uint8_t new_range_start, uint8_t new_range_end) 
     node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
     //printf("Updated hash span: %d\n", node->hash_span);
 }
-
-
-
 
 uint8_t* constructing_insert_pdu (struct VAL_INSERT_PDU* pdu, size_t pdu_size){
 
@@ -193,15 +189,16 @@ void transfer_all_entries(void* n, bool to_successor){
 
 void destroy_allocated_memory(void* n){
     Node* node = (Node*)n;
-
+	printf("[destroy_allocated_memory]\n");
     if(node->hash_table){
         ht_destroy(node->hash_table);
     }
+	printf("Meme tes2t\n");
     if(node->queue){
         queue_destroy(node->queue);
     }
-
-    
+	printf("Meme tes3t\n");
     freeaddrinfo(node->tracker_addr);
+	printf("Meme tes4t\n");
     free(node);
 }

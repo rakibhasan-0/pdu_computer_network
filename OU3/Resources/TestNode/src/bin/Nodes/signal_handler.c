@@ -1,9 +1,5 @@
 #include "signal_handler.h"
 
-
-
-
-
 size_t construct_net_new_range(struct NET_NEW_RANGE_PDU* pdu, char* buffer, Node* node){ 
 
     size_t offset = 0; 
@@ -28,15 +24,6 @@ size_t serialize_net_leaving (const struct NET_LEAVING_PDU* pdu, char* buffer){
     return offset;
 }
 
-
-
-
-
-
-
-
-
-
 // that function intends to close the connection by closing all the sockets.
 static void close_connection (Node* node){
     
@@ -60,7 +47,7 @@ static void close_connection (Node* node){
             perror("close sockfd_d failed");
         }
     }
-
+	printf("Meme test\n");
     // we may need to deallocate the memory here.
     destroy_allocated_memory(node);
 
