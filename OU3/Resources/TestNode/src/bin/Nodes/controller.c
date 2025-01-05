@@ -111,6 +111,7 @@ int q6_state(void* n, void* data){
                     }
 
                     udp_buffer_filled += bytes_recv;
+                    printf("the bytes received from the udp socket is %d\n", bytes_recv);
 
                     struct PDU pdu;
                     pdu.type = udp_buffer[0];
