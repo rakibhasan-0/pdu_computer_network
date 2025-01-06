@@ -321,9 +321,12 @@ static void lookup_value(Node* node, struct VAL_LOOKUP_PDU* pdu) {
             printf("Entry with SSN %.12s not found in the hash table\n", pdu->ssn);
             // Send a response indicating the entry was not found
             Entry dummy_entry = {0};
-            dummy_entry.ssn = "00000000000";
+            dummy_entry.ssn = "000000000000";
             dummy_entry.name = "0";
             dummy_entry.email = "0";
+            dummy_entry.name_length = 1;
+            dummy_entry.email_length = 1;
+
             send_val_lookup_response(&dummy_entry, pdu, node);
         }
 
@@ -406,10 +409,33 @@ static void parse_val_lookup_pdu(const uint8_t* buffer, struct VAL_LOOKUP_PDU* p
 void send_val_lookup_response(const struct Entry* entry, const struct VAL_LOOKUP_PDU* pdu, Node* node) {
 
     // serialize the entry into the buffer.
-    char lookup_response_buffer[sizeof(struct VAL_LOOKUP_RESPONSE_PDU)];
-    memset(lookup_response_buffer, 0, sizeof(lookup_response_buffer));
+    ssize_t lookup_response_size = 1 + SSN_LENGTH + 1 + entry->name_length + 1 + entry->email_length;
+    uint8_t* lookup_response_buffer = malloc(lookup_response_size);
+
+    if (!lookup_response_buffer) {
+        perror("Memory allocation failed for VAL_LOOKUP response buffer");
+        return;
+    }
+    memset(lookup_response_buffer, 0, lookup_response_size);
+    printf("the size of the lookup response buffer is %zu\n", lookup_response_size);
+
+
+    uint32_t temp_sender_address = pdu->sender_address;
+
+
+    struct sockaddr_in client_addr_test;
+    client_addr_test.sin_family = AF_INET;
+    client_addr_test.sin_port = pdu->sender_port;
+    client_addr_test.sin_addr.s_addr = pdu->sender_address;
+
+    printf("the address_temp of the client is %s\n", inet_ntoa(client_addr_test.sin_addr)); // network order
+    printf("the port of the client is %d\n", client_addr_test.sin_port); // network order
+
 
     int bytes_to_send = sererialize_val_lookup_response(entry, lookup_response_buffer);
+    printf("the bytes to send is %d\n", bytes_to_send);
+    printf("the true respons size is %zu\n", 1 + SSN_LENGTH + 1 + entry->name_length + 1 + entry->email_length);
+
 
     // now we will send the response to the client.
     struct sockaddr_in client_addr;
@@ -417,20 +443,22 @@ void send_val_lookup_response(const struct Entry* entry, const struct VAL_LOOKUP
     client_addr.sin_port = htons(pdu->sender_port);
     client_addr.sin_addr.s_addr = htonl(pdu->sender_address);
 
-    //printf("the address of the client is %s\n", inet_ntoa(client_addr.sin_addr));
-    //printf("the port of the client is %d\n", client_addr.sin_port);
+    printf("the address of the client is %s\n", inet_ntoa(client_addr.sin_addr));
+    printf("the port of the client is %d\n", client_addr.sin_port);
 
     if(node->sockfd_a < 0){
         perror("socket failure");
         return;
     }
 
-    int send_status = sendto(node->sockfd_a, lookup_response_buffer, sizeof(lookup_response_buffer), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
+    int send_status = sendto(node->sockfd_a, lookup_response_buffer, bytes_to_send, 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
     if (send_status == -1) {
         perror("Failed to send VAL_LOOKUP response");
     } else {
         printf("Lookup response sent for SSN: %.12s\n", pdu->ssn);
     }
+
+    free(lookup_response_buffer);
 
 }
 
@@ -451,4 +479,5 @@ static int sererialize_val_lookup_response(const struct Entry* entry, uint8_t* b
     offset += entry->email_length;
 
     printf("the offset is %zu\n", offset);
+    return offset;
 }
