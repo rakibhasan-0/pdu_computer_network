@@ -249,10 +249,10 @@ static void process_queue(Node* node) {
 }
 
 static void manage_pdu(Node* node, PDU* pdu) {
-    printf("Managing PDU of type: %d, size: %zu bytes\n", pdu->type, pdu->size);
+    //printf("Managing PDU of type: %d, size: %zu bytes\n", pdu->type, pdu->size);
     switch (pdu->type) {
         case NET_LEAVING:
-            printf("  NET_LEAVING_PDU: Freeing PDU buffer of size: %zu bytes\n", pdu->size);
+            //printf("  NET_LEAVING_PDU: Freeing PDU buffer of size: %zu bytes\n", pdu->size);
             struct NET_LEAVING_PDU net_leave = {0};
             deserialize_net_leave(&net_leave, pdu->buffer, pdu->size);
             printf("Received NET_LEAVING PDU\n");
@@ -277,7 +277,7 @@ static void manage_pdu(Node* node, PDU* pdu) {
             printf("Processed VAL PDU\n");
             break;
         case NET_JOIN:
-            printf("  NET_JOIN_PDU: Freeing PDU buffer of size: %zu bytes\n", pdu->size);
+            //printf("  NET_JOIN_PDU: Freeing PDU buffer of size: %zu bytes\n", pdu->size);
             struct NET_JOIN_PDU net_join;
             deserialize_net_join(&net_join, pdu->buffer);
             node->state_handler = state_handlers[STATE_12];
@@ -285,7 +285,7 @@ static void manage_pdu(Node* node, PDU* pdu) {
             printf("Processed NET_JOIN PDU\n");
             break;
         case NET_CLOSE_CONNECTION:
-            printf("  NET_CLOSE_CONNECTION: Freeing PDU buffer of size: %zu bytes\n", pdu->size);
+            //printf("  NET_CLOSE_CONNECTION: Freeing PDU buffer of size: %zu bytes\n", pdu->size);
             node->state_handler = state_handlers[STATE_17];
             node->state_handler(node, pdu);
             printf("Processed NET_CLOSE_CONNECTION PDU\n");
@@ -294,7 +294,7 @@ static void manage_pdu(Node* node, PDU* pdu) {
             printf("Unknown PDU type: %u\n", pdu->type);
             break;
     }
-    printf("22Freeing PDU buffer of size: %zu bytes\n", pdu->size);
+    //printf("22Freeing PDU buffer of size: %zu bytes\n", pdu->size);
     //free(pdu->buffer);
 }
 
