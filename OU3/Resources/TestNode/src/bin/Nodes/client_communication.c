@@ -314,23 +314,9 @@ static void lookup_value(Node* node, struct VAL_LOOKUP_PDU* pdu) {
         Entry* entry = ht_lookup(node->hash_table, pdu->ssn);
         if (!entry) {
             printf("Entry with SSN %.12s not found in the hash table\n", pdu->ssn);
-            // Send a response indicating the entry was not found
-            struct VAL_LOOKUP_RESPONSE_PDU response_pdu = {0};
-            response_pdu.type = VAL_LOOKUP_RESPONSE;
-            memset(response_pdu.ssn, '0', SSN_LENGTH);
-            response_pdu.name_length = 0;
-            response_pdu.email_length = 0;
-
-            struct sockaddr_in client_addr;
-            memset(&client_addr, 0, sizeof(client_addr));
-            client_addr.sin_family = AF_INET;
-            client_addr.sin_addr.s_addr = pdu->sender_address;
-            client_addr.sin_port = htons(pdu->sender_port); // Convert to network byte order
-            send_lookup_response(node, &response_pdu, &client_addr);
-            return;
+			//Skill issue write correctly
         }
 
-        // Log the found entry
         printf("Found entry with SSN: %.12s\n", entry->ssn);
         printf("Name: %.*s\n", entry->name_length, entry->name);
         printf("Email: %.*s\n", entry->email_length, entry->email);
@@ -367,10 +353,14 @@ static void lookup_value(Node* node, struct VAL_LOOKUP_PDU* pdu) {
         memcpy(out_buffer + offset, pdu->ssn, SSN_LENGTH);
         offset += SSN_LENGTH;
 
-        *(uint32_t*)(out_buffer + offset) = pdu->sender_address;
-        offset += sizeof(uint32_t);
-        *(uint16_t*)(out_buffer + offset) = htons(pdu->sender_port); // Convert to network byte order
-        offset += sizeof(uint16_t);
+		// Write the sender address (32-bit value) into the buffer
+		memcpy(out_buffer + offset, &pdu->sender_address, sizeof(uint32_t));
+		offset += sizeof(uint32_t); // Move the offset forward by the size of a 32-bit value
+
+		// Write the sender port (16-bit value) into the buffer, converting to network byte order
+		uint16_t network_port = htons(pdu->sender_port);
+		memcpy(out_buffer + offset, &network_port, sizeof(uint16_t));
+		offset += sizeof(uint16_t); // Move the offset forward by the size of a 16-bit value
 
         int send_status = send(node->sockfd_b, out_buffer, pdu_size, 0);
         if (send_status == -1) {
@@ -404,7 +394,6 @@ static void send_lookup_response(Node* node, struct VAL_LOOKUP_RESPONSE_PDU* res
     memcpy(out_buffer + offset, response_pdu->email, response_pdu->email_length);
     offset += response_pdu->email_length;
 
-    printf("Sending response PDU to client at %s:%d\n", inet_ntoa(client_addr->sin_addr), ntohs(client_addr->sin_port));
     int send_status = sendto(node->sockfd_a, out_buffer, pdu_size, 0, (struct sockaddr*)client_addr, sizeof(*client_addr));
     if (send_status == -1) {
         perror("sendto failure");
@@ -433,13 +422,34 @@ static bool parse_val_lookup_pdu(const uint8_t* buffer, struct VAL_LOOKUP_PDU* p
     }
     printf(" (offset: %zu)\n", offset);
 
-    pdu_out->sender_address = *(uint32_t*)(buffer + offset);
-    offset += sizeof(uint32_t);
-    pdu_out->sender_port = ntohs(*(uint16_t*)(buffer + offset)); // Convert from network byte order
-    offset += sizeof(uint16_t);
+	// Copy the sender address (32-bit value) from the buffer
+	memcpy(&pdu_out->sender_address, buffer + offset, sizeof(uint32_t));
+	offset += sizeof(uint32_t);
 
-    printf("Sender address: %s, Sender port: %d\n", inet_ntoa(*(struct in_addr*)&pdu_out->sender_address), pdu_out->sender_port);
+	// Copy the sender port (16-bit value) from the buffer and convert from network byte order
+	uint16_t network_port;
+	memcpy(&network_port, buffer + offset, sizeof(uint16_t));
+	pdu_out->sender_port = ntohs(network_port);
+	offset += sizeof(uint16_t);
 
     return true;
 }
+/*
+htons (Host to Network Short)
+ntohs (Network to Host Short)
+sockfd_a is the UDP socket
+*/
+/*There are many implicit and explicit rules of the distributed hash table, some
+of the most important ones are listed below.
 
+Only one insertion of a node is performed at a time.
+SSN is represented as 12-bytes, YYYYMMDDXXXX, no null termination.
+Name and email fields are at most 255 characters, no null termination.
+Invalid PDUs can be dropped without response.
+All port fields are transmitted in network byte order, also known as big-endian.
+
+It is crucial that you handle this correctly, as the communication will not function
+if there is cross-network varying byte order.
+Check the htons and ntohs functions in C
+
+Note: It is assumed that no PDU sent over UDP can get corrupted or get dropped.*/
