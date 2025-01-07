@@ -26,15 +26,15 @@
 
 static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu);
 static bool parse_val_insert_pdu(const uint8_t* buffer, struct VAL_INSERT_PDU* pdu_out);
-static void remove_value(Node* node, struct VAL_REMOVE_PDU* val_remove_pdu);
-static bool parse_val_remove_pdu(const uint8_t* buffer, struct VAL_REMOVE_PDU* pdu_out);
 static void lookup_value(Node* node, struct VAL_LOOKUP_PDU* pdu);
+static void remove_value(Node* node, struct VAL_REMOVE_PDU* pdu);
+static bool parse_val_remove_pdu(const uint8_t* buffer, struct VAL_REMOVE_PDU* pdu_out);
 static bool parse_val_lookup_pdu(const uint8_t* buffer, struct VAL_LOOKUP_PDU* pdu_out);
 static void send_lookup_response(Node* node, struct VAL_LOOKUP_RESPONSE_PDU* response_pdu, struct sockaddr_in* client_addr);
 
 int q9_state(void* n, void* data) {
     Node* node = (Node*)n;
-    //printf("[Q9 state]\n");
+    //printf("[Q9 state]\n");sds
 
     // now we will transfer data into the queue as we have inserted data into the queue in the state 6.
     
@@ -47,7 +47,7 @@ int q9_state(void* n, void* data) {
   
     PDU* pdu = (PDU*)data;
     uint8_t pdu_type = pdu->type;
-
+	
     switch (pdu_type) {
 
         case VAL_INSERT:
@@ -64,16 +64,16 @@ int q9_state(void* n, void* data) {
 
         case VAL_REMOVE:
             printf("Handling VAL_REMOVE\n");
-            struct VAL_REMOVE_PDU val_remove_pdu;
-        // parse_val_remove_pdu(entry_data, &val_remove_pdu);
-            printf("SSN: %s\n", val_remove_pdu.ssn);
-            remove_value(node, &val_remove_pdu);
-            remove_value(node, &val_remove_pdu);
+			struct VAL_REMOVE_PDU val_remove_pdu;
+			if (parse_val_remove_pdu(pdu->buffer, &val_remove_pdu)) {
+				printf("SSN: %s\n", val_remove_pdu.ssn);
+				remove_value(node, &val_remove_pdu);
+			}
             break;
         case VAL_LOOKUP: 
             printf("Handling VAL_LOOKUP\n");
+			struct VAL_LOOKUP_PDU val_lookup_pdu;
 			printf("Current sockfd_b lookup: %d\n", node->sockfd_b);
-            struct VAL_LOOKUP_PDU val_lookup_pdu;
 			if (parse_val_lookup_pdu(pdu->buffer, &val_lookup_pdu)) {
 				printf("SSN: %s\n", val_lookup_pdu.ssn);
 				lookup_value(node, &val_lookup_pdu);
@@ -255,48 +255,63 @@ static bool parse_val_insert_pdu(const uint8_t* buffer, struct VAL_INSERT_PDU* p
 	####REMOOOOOOOOOOOOOOOOOOOOVE###
 */
 static void remove_value(Node* node, struct VAL_REMOVE_PDU* pdu) {
-    uint8_t hash_value = hash_ssn(pdu->ssn);
+    if (!node || !pdu || !node->hash_table) {
+        fprintf(stderr, "Invalid arguments to remove_value\n");
+        return;
+    }
 
+    uint8_t hash_value = hash_ssn((char *)pdu->ssn);
     printf("Hash value: %d\n", hash_value);
+
+    // Check if the hash value falls within this node's range
     if (hash_value >= node->hash_range_start && hash_value <= node->hash_range_end) {
         printf("Removing value with SSN: %.12s\n", pdu->ssn);
 
-        // Find the entry in the hash table
-        Entry* entry = (Entry*)ht_remove(node->hash_table, pdu->ssn);
-        if (!entry) {
-            printf("Entry with SSN %.12s not found in the hash table\n", pdu->ssn);
+        // Remove the entry from the hash table
+        ht_remove(node->hash_table, (char *)pdu->ssn);
+        printf("Value with SSN %.12s removed successfully\n", pdu->ssn);
+    } else {
+        // Forward the remove request to the successor
+        printf("Forwarding VAL_REMOVE to successor\n");
+
+        size_t pdu_size = 1 + SSN_LENGTH;
+        uint8_t* out_buffer = malloc(pdu_size);
+        if (!out_buffer) {
+            perror("Memory allocation failed");
             return;
         }
 
-        // Free that memory
-        printf("Freeing the memory\n");
-        //free(entry->ssn);
-        //free(entry->name);
-        //free(entry->email);
-        //free(entry);
-        printf("Removed value with SSN: %.12s\n", pdu->ssn);
-    } else {
-        printf("Value with SSN: %.12s is out of range for this node.\n", pdu->ssn);
+        size_t offset = 0;
+        out_buffer[offset++] = VAL_REMOVE;
+        memcpy(out_buffer + offset, pdu->ssn, SSN_LENGTH);
+        offset += SSN_LENGTH;
+
+        int send_status = send(node->sockfd_b, out_buffer, pdu_size, 0);
+        if (send_status == -1) {
+            perror("send failure");
+        } else {
+            printf("VAL_REMOVE forwarded to successor\n");
+        }
+
+        free(out_buffer);
     }
 }
 
 static bool parse_val_remove_pdu(const uint8_t* buffer, struct VAL_REMOVE_PDU* pdu_out) {
+    if (!buffer || !pdu_out) {
+        return false;
+    }
     size_t offset = 0;
-
-    printf("Parsing PDU for removal\n");
-    pdu_out->type = buffer[offset++];
-    printf("Type: %d (offset: %zu)\n", pdu_out->type, offset);
-
-    memcpy(pdu_out->ssn, buffer + offset, SSN_LENGTH);
+    pdu_out->type = buffer[offset++];  // Type (1 byte)
+    memcpy(pdu_out->ssn, buffer + offset, SSN_LENGTH); // SSN (12 bytes)
     offset += SSN_LENGTH;
-
-    // Ensure SSN is null-terminated IMPORTANT!!
-    pdu_out->ssn[SSN_LENGTH] = '\0';
-    printf("SSN: %s (offset: %zu)\n", pdu_out->ssn, offset);
 
     return true;
 }
 
+/*
+	####LOOOOKUP###
+*/
 static void lookup_value(Node* node, struct VAL_LOOKUP_PDU* pdu) {
     if (!node || !pdu || !node->hash_table) {
         fprintf(stderr, "Invalid arguments to lookup_value\n");
