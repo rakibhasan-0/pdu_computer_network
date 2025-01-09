@@ -329,7 +329,7 @@ static void lookup_value(Node* node, struct VAL_LOOKUP_PDU* pdu) {
         Entry* entry = ht_lookup(node->hash_table, pdu->ssn);
         if (!entry) {
             printf("Entry with SSN %.12s not found in the hash table\n", pdu->ssn);
-			//Skill issue write correctly
+			//Skill issue write correctly i try and fix this later, wasn't implemented in the rust code
         }
 
         printf("Found entry with SSN: %.12s\n", entry->ssn);
