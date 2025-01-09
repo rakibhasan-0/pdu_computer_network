@@ -74,18 +74,31 @@ void transfer_upper_half(void* node, uint8_t range_start, uint8_t range_end){
     }
 
 
-    printf("Transferring %d entries to the successor\n", entries_count);
-
+    //printf("Transferring %d entries to the successor\n", entries_count);
+    // get the total size of the buffer.
+    size_t total_size = 0;
     for(int i = 0; i < entries_count; i++){
+        char* ssn = entries_to_transfer[i];
+        Entry* entry = (Entry*)ht_lookup(n->hash_table, ssn);
+        total_size += 1 + SSN_LENGTH + 1 + entry->name_length + 1 + entry->email_length;
+    }
 
+    // allocate big buffer to store all entries.
+    uint8_t* buffer_to_store_all_entries = (uint8_t*)malloc(total_size);
+    if(!buffer_to_store_all_entries){
+        perror("Memory allocation failed for buffer_to_store_all_entries");
+        return;
+    }
+
+    memset(buffer_to_store_all_entries, 0, total_size);
+
+    size_t offset = 0;
+
+    // we are storing all entries in the buffer.
+    for(int i = 0; i < entries_count; i++){
         char* ssn = entries_to_transfer[i];
         Entry* entry = (Entry*)ht_lookup(n->hash_table, ssn);
 
-       /** printf("{The values value with SSN: %.*s, Name: %.*s, Email: %.*s}\n",
-        (int)SSN_LENGTH, entry->ssn,
-        (int)entry->name_length, entry->name,
-        (int)entry->email_length, entry->email);*/
-        
         struct VAL_INSERT_PDU val_insert = {0};
         val_insert.type = VAL_INSERT;
         memcpy(val_insert.ssn, entry->ssn, SSN_LENGTH);
@@ -97,22 +110,32 @@ void transfer_upper_half(void* node, uint8_t range_start, uint8_t range_end){
         size_t pdu_size = 1 + SSN_LENGTH + 1 + entry->name_length + 1 + entry->email_length;
 
         uint8_t* out_buffer = constructing_insert_pdu(&val_insert, pdu_size);
-        int send_status = send(n->sockfd_b, out_buffer,pdu_size, 0);
-        if (send_status == -1) {
-            perror("send failure");
-        } else {
-            printf("VAL_INSERT forwarded to successor\n");
-        }
-
-        ht_remove(n->hash_table, ssn);
+        memcpy(buffer_to_store_all_entries + offset, out_buffer, pdu_size);
+        offset += pdu_size;
         free(out_buffer);
+    }
+
+    int send_status = send(n->sockfd_b, buffer_to_store_all_entries, total_size, 0);
+    if (send_status == -1) {
+        perror("send failure");
+    }else{
+        printf("Transferring %d entries to the successor\n", entries_count);
+    }
+
+    // now we will remove all the entries from the hash table.
+    for(int i = 0; i < entries_count; i++){
+        char* ssn = entries_to_transfer[i];
+        Entry* entry = (Entry*)ht_lookup(n->hash_table, ssn);
+        ht_remove(n->hash_table, ssn);
         //free(entry->ssn);
         //free(entry->name);
         //free(entry->email);
         //free(entry);
-       // sleep(1);
+    }
 
-    }   
+    printf("Transferring %d entries to the successor\n", entries_count);
+    free(buffer_to_store_all_entries);
+
 
 }
 
@@ -140,17 +163,30 @@ void transfer_all_entries(void* n, bool to_successor){
         }
     }
 
-    printf("Transferring %d entries to the successor\n", entries_count);
+    // calculate the total size
+    size_t total_size = 0;
+    for(int i = 0; i < entries_count; i++){
+        char* ssn = entries_to_transfer[i];
+        Entry* entry = (Entry*)ht_lookup(noed->hash_table, ssn);
+        total_size += 1 + SSN_LENGTH + 1 + entry->name_length + 1 + entry->email_length;
+    }
 
+
+    // allocate big buffer to store all entries.
+    uint8_t* buffer_to_store_all_entries = (uint8_t*)malloc(total_size);
+    if(!buffer_to_store_all_entries){
+        perror("Memory allocation failed for buffer_to_store_all_entries");
+        return;
+    }
+    memset(buffer_to_store_all_entries, 0, total_size);
+
+    size_t offset = 0;
+
+    // we are storing all entries in the buffer.
     for(int i = 0; i < entries_count; i++){
         char* ssn = entries_to_transfer[i];
         Entry* entry = (Entry*)ht_lookup(noed->hash_table, ssn);
 
-        /*printf("{The values value with SSN: %.*s, Name: %.*s, Email: %.*s}\n",
-        (int)SSN_LENGTH, entry->ssn,
-        (int)entry->name_length, entry->name,
-        (int)entry->email_length, entry->email);*/
-        
         struct VAL_INSERT_PDU val_insert = {0};
         val_insert.type = VAL_INSERT;
         memcpy(val_insert.ssn, entry->ssn, SSN_LENGTH);
@@ -162,27 +198,38 @@ void transfer_all_entries(void* n, bool to_successor){
         size_t pdu_size = 1 + SSN_LENGTH + 1 + entry->name_length + 1 + entry->email_length;
 
         uint8_t* out_buffer = constructing_insert_pdu(&val_insert, pdu_size);
-        int send_status;
-        if(to_successor){
-            send_status = send(noed->sockfd_b, out_buffer,pdu_size, 0);
-        }
-        else {
-            send_status = send(noed->sockfd_d, out_buffer,pdu_size, 0);
-        }
-        if (send_status == -1) {
-            perror("send failure");
-        }
-
-        ht_remove(noed->hash_table, ssn);
+        memcpy(buffer_to_store_all_entries + offset, out_buffer, pdu_size);
+        offset += pdu_size;
         free(out_buffer);
-        
+    }
+
+
+    int send_status;
+    if(to_successor){
+        send_status = send(noed->sockfd_b, buffer_to_store_all_entries, total_size, 0);
+        printf("Transferring %d entries to the successor\n", entries_count);
+    }
+    else {
+        send_status = send(noed->sockfd_d, buffer_to_store_all_entries, total_size, 0);
+        printf("Transferring %d entries to the predecessor\n", entries_count);
+    }
+    if (send_status == -1) {
+        perror("send failure");
+    }
+
+    // now we will remove all the entries from the hash table.
+    for(int i = 0; i < entries_count; i++){
+        char* ssn = entries_to_transfer[i];
+        Entry* entry = (Entry*)ht_lookup(noed->hash_table, ssn);
+        ht_remove(noed->hash_table, ssn);
         //free(entry->ssn);
         //free(entry->name);
         //free(entry->email);
         //free(entry);
-       // sleep(1);
-
     }
+
+ 
+    free(buffer_to_store_all_entries);
 
 
 }
