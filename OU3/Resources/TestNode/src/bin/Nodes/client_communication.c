@@ -329,29 +329,73 @@ static void lookup_value(Node* node, struct VAL_LOOKUP_PDU* pdu) {
         Entry* entry = ht_lookup(node->hash_table, pdu->ssn);
         if (!entry) {
             printf("Entry with SSN %.12s not found in the hash table\n", pdu->ssn);
-			//Skill issue write correctly i try and fix this later, wasn't implemented in the rust code
+
+            Entry* dummy_entry = (Entry*)malloc(sizeof(Entry));
+            dummy_entry->ssn = (char*)malloc(SSN_LENGTH);
+            memset(dummy_entry->ssn, 0, SSN_LENGTH);
+            dummy_entry->name = (char*)malloc(2);
+            memset(dummy_entry->name, 0, 2);
+            dummy_entry->name_length = 2;
+            dummy_entry->email = (char*)malloc(2);
+            memset(dummy_entry->email, 0, 2);
+            dummy_entry->email_length = 2;
+
+            struct VAL_LOOKUP_RESPONSE_PDU response_pdu = {0};
+            response_pdu.type = VAL_LOOKUP_RESPONSE;
+            memcpy(response_pdu.ssn, dummy_entry->ssn, SSN_LENGTH);
+
+            response_pdu.name_length = dummy_entry->name_length;
+            response_pdu.name = malloc(dummy_entry->name_length);
+            memcpy(response_pdu.name, dummy_entry->name, dummy_entry->name_length);
+
+            response_pdu.email_length = dummy_entry->email_length;
+            response_pdu.email = malloc(dummy_entry->email_length);
+            memcpy(response_pdu.email, dummy_entry->email, dummy_entry->email_length);
+        
+
+            struct sockaddr_in client_addr;
+            memset(&client_addr, 0, sizeof(client_addr));
+            client_addr.sin_family = AF_INET;
+            client_addr.sin_addr.s_addr = pdu->sender_address;
+            client_addr.sin_port = htons(pdu->sender_port); // Convert to network byte order
+            send_lookup_response(node, &response_pdu, &client_addr);
+            free(dummy_entry->ssn);
+            free(dummy_entry->name);
+            free(dummy_entry->email);
+            free(response_pdu.name);
+            free(response_pdu.email);
+            free(dummy_entry);
+
         }
 
-        printf("Found entry with SSN: %.12s\n", entry->ssn);
-        printf("Name: %.*s\n", entry->name_length, entry->name);
-        printf("Email: %.*s\n", entry->email_length, entry->email);
+        else{
 
-        // Prepare the response PDU
-        struct VAL_LOOKUP_RESPONSE_PDU response_pdu = {0};
-        response_pdu.type = VAL_LOOKUP_RESPONSE;
-        memcpy(response_pdu.ssn, entry->ssn, SSN_LENGTH);
-        response_pdu.name_length = entry->name_length;
-        response_pdu.name = entry->name;
-        response_pdu.email_length = entry->email_length;
-        response_pdu.email = entry->email;
+            printf("Found entry with SSN: %.12s\n", entry->ssn);
+            printf("Name: %.*s\n", entry->name_length, entry->name);
+            printf("Email: %.*s\n", entry->email_length, entry->email);
 
-        // Send the response for the found entry
-        struct sockaddr_in client_addr;
-        memset(&client_addr, 0, sizeof(client_addr));
-        client_addr.sin_family = AF_INET;
-        client_addr.sin_addr.s_addr = pdu->sender_address;
-        client_addr.sin_port = htons(pdu->sender_port); // Convert to network byte order
-        send_lookup_response(node, &response_pdu, &client_addr);
+            // Prepare the response PDU
+            struct VAL_LOOKUP_RESPONSE_PDU response_pdu = {0};
+            response_pdu.type = VAL_LOOKUP_RESPONSE;
+
+            memcpy(response_pdu.ssn, entry->ssn, SSN_LENGTH);
+            response_pdu.name_length = entry->name_length;
+            response_pdu.name = entry->name;
+            response_pdu.email_length = entry->email_length;
+            response_pdu.email = entry->email;
+
+            // Send the response for the found entry
+            struct sockaddr_in client_addr;
+            memset(&client_addr, 0, sizeof(client_addr));
+            client_addr.sin_family = AF_INET;
+            client_addr.sin_addr.s_addr = pdu->sender_address;
+            client_addr.sin_port = htons(pdu->sender_port); // Convert to network byte order
+
+            send_lookup_response(node, &response_pdu, &client_addr);
+
+        }
+
+
     } else {
         // Forward the lookup request to the successor
         printf("Forwarding VAL_LOOKUP to successor\n");
@@ -391,6 +435,7 @@ static void lookup_value(Node* node, struct VAL_LOOKUP_PDU* pdu) {
 static void send_lookup_response(Node* node, struct VAL_LOOKUP_RESPONSE_PDU* response_pdu, struct sockaddr_in* client_addr) {
     // Calculate the total size of the PDU buffer
     size_t pdu_size = 1 + SSN_LENGTH + 1 + response_pdu->name_length + 1 + response_pdu->email_length;
+    
     uint8_t* out_buffer = malloc(pdu_size);
     if (!out_buffer) {
         perror("Memory allocation failed for PDU buffer");
@@ -416,6 +461,7 @@ static void send_lookup_response(Node* node, struct VAL_LOOKUP_RESPONSE_PDU* res
         printf("Response sent successfully\n");
     }
 
+    printf("seg fault here\n");
     free(out_buffer);
 }
 
