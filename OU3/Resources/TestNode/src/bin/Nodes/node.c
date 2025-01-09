@@ -32,7 +32,6 @@ int main(int argc, char* argv[]) {
     struct addrinfo hints;
     struct addrinfo *res;
 
-
     if(argc != 3) {
         fprintf(stderr, "Usage: %s <hostname> <port>\n", argv[0]);
         return 1;
@@ -65,7 +64,11 @@ int main(int argc, char* argv[]) {
     node->tracker_addr = res;
     node->state_handler = state_handlers[STATE_1]; // we are initializing the function pointer to point to the q1 state.
     node->state_handler(node, NULL); // now we are incoking the function by using the function pointer.
-    
+	//ht_destroy(node->hash_table);
+	//printf("Meme test\n");
+	//queue_destroy(node->queue);
+    //freeaddrinfo(node->tracker_addr);
+	destroy_allocated_memory(node);
     return 0;
 }
 
