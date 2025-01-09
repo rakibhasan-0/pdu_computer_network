@@ -26,15 +26,15 @@
 
 static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu);
 static bool parse_val_insert_pdu(const uint8_t* buffer, struct VAL_INSERT_PDU* pdu_out);
-static void remove_value(Node* node, struct VAL_REMOVE_PDU* val_remove_pdu);
-static bool parse_val_remove_pdu(const uint8_t* buffer, struct VAL_REMOVE_PDU* pdu_out);
 static void lookup_value(Node* node, struct VAL_LOOKUP_PDU* pdu);
+static void remove_value(Node* node, struct VAL_REMOVE_PDU* pdu);
+static bool parse_val_remove_pdu(const uint8_t* buffer, struct VAL_REMOVE_PDU* pdu_out);
 static bool parse_val_lookup_pdu(const uint8_t* buffer, struct VAL_LOOKUP_PDU* pdu_out);
-void send_val_lookup_response(const struct Entry* entry, int socket_fd);
+static void send_lookup_response(Node* node, struct VAL_LOOKUP_RESPONSE_PDU* response_pdu, struct sockaddr_in* client_addr);
 
 int q9_state(void* n, void* data) {
     Node* node = (Node*)n;
-    //printf("[Q9 state]\n");
+    //printf("[Q9 state]\n");sds
 
     // now we will transfer data into the queue as we have inserted data into the queue in the state 6.
     
@@ -47,12 +47,12 @@ int q9_state(void* n, void* data) {
   
     PDU* pdu = (PDU*)data;
     uint8_t pdu_type = pdu->type;
-
+	
     switch (pdu_type) {
 
         case VAL_INSERT:
             struct VAL_INSERT_PDU pdu_insert = {0};
-
+			printf("Current sockfd_b insert: %d\n", node->sockfd_b);
             // Parse the buffer into the PDU structure of the VAL_INSERT_PDU type
             if(parse_val_insert_pdu(pdu->buffer, &pdu_insert)) {
                 insertion_of_value(node, &pdu_insert);
@@ -64,18 +64,20 @@ int q9_state(void* n, void* data) {
 
         case VAL_REMOVE:
             printf("Handling VAL_REMOVE\n");
-            struct VAL_REMOVE_PDU val_remove_pdu;
-        // parse_val_remove_pdu(entry_data, &val_remove_pdu);
-            printf("SSN: %s\n", val_remove_pdu.ssn);
-            remove_value(node, &val_remove_pdu);
-            remove_value(node, &val_remove_pdu);
+			struct VAL_REMOVE_PDU val_remove_pdu;
+			if (parse_val_remove_pdu(pdu->buffer, &val_remove_pdu)) {
+				printf("SSN: %s\n", val_remove_pdu.ssn);
+				remove_value(node, &val_remove_pdu);
+			}
             break;
         case VAL_LOOKUP: 
             printf("Handling VAL_LOOKUP\n");
-            struct VAL_LOOKUP_PDU val_lookup_pdu;
-        // parse_val_lookup_pdu(entry_data, &val_lookup_pdu);
-            printf("SSN: %s\n", val_lookup_pdu.ssn);
-            lookup_value(node, &val_lookup_pdu);
+			struct VAL_LOOKUP_PDU val_lookup_pdu;
+			printf("Current sockfd_b lookup: %d\n", node->sockfd_b);
+			if (parse_val_lookup_pdu(pdu->buffer, &val_lookup_pdu)) {
+				printf("SSN: %s\n", val_lookup_pdu.ssn);
+				lookup_value(node, &val_lookup_pdu);
+			}
         
             break;
         default:
@@ -103,7 +105,7 @@ static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu) {
 
     //printf("Hash value: %d\n", hash_value);
     if (hash_value >= node->hash_range_start && hash_value <= node->hash_range_end) {
-        //printf("Inserting value with SSN: %.12s\n", pdu->ssn);
+        printf("Inserting value with SSN: %.12s\n", pdu->ssn);
 
         Entry* entry = (Entry*)malloc(sizeof(Entry));
         if (!entry) {
@@ -253,48 +255,63 @@ static bool parse_val_insert_pdu(const uint8_t* buffer, struct VAL_INSERT_PDU* p
 	####REMOOOOOOOOOOOOOOOOOOOOVE###
 */
 static void remove_value(Node* node, struct VAL_REMOVE_PDU* pdu) {
-    uint8_t hash_value = hash_ssn(pdu->ssn);
+    if (!node || !pdu || !node->hash_table) {
+        fprintf(stderr, "Invalid arguments to remove_value\n");
+        return;
+    }
 
+    uint8_t hash_value = hash_ssn((char *)pdu->ssn);
     printf("Hash value: %d\n", hash_value);
+
+    // Check if the hash value falls within this node's range
     if (hash_value >= node->hash_range_start && hash_value <= node->hash_range_end) {
         printf("Removing value with SSN: %.12s\n", pdu->ssn);
 
-        // Find the entry in the hash table
-        Entry* entry = (Entry*)ht_remove(node->hash_table, pdu->ssn);
-        if (!entry) {
-            printf("Entry with SSN %.12s not found in the hash table\n", pdu->ssn);
+        // Remove the entry from the hash table
+        ht_remove(node->hash_table, (char *)pdu->ssn);
+        printf("Value with SSN %.12s removed successfully\n", pdu->ssn);
+    } else {
+        // Forward the remove request to the successor
+        printf("Forwarding VAL_REMOVE to successor\n");
+
+        size_t pdu_size = 1 + SSN_LENGTH;
+        uint8_t* out_buffer = malloc(pdu_size);
+        if (!out_buffer) {
+            perror("Memory allocation failed");
             return;
         }
 
-        // Free that memory
-        printf("Freeing the memory\n");
-        //free(entry->ssn);
-        //free(entry->name);
-        //free(entry->email);
-        //free(entry);
-        printf("Removed value with SSN: %.12s\n", pdu->ssn);
-    } else {
-        printf("Value with SSN: %.12s is out of range for this node.\n", pdu->ssn);
+        size_t offset = 0;
+        out_buffer[offset++] = VAL_REMOVE;
+        memcpy(out_buffer + offset, pdu->ssn, SSN_LENGTH);
+        offset += SSN_LENGTH;
+
+        int send_status = send(node->sockfd_b, out_buffer, pdu_size, 0);
+        if (send_status == -1) {
+            perror("send failure");
+        } else {
+            printf("VAL_REMOVE forwarded to successor\n");
+        }
+
+        free(out_buffer);
     }
 }
 
 static bool parse_val_remove_pdu(const uint8_t* buffer, struct VAL_REMOVE_PDU* pdu_out) {
+    if (!buffer || !pdu_out) {
+        return false;
+    }
     size_t offset = 0;
-
-    printf("Parsing PDU for removal\n");
-    pdu_out->type = buffer[offset++];
-    printf("Type: %d (offset: %zu)\n", pdu_out->type, offset);
-
-    memcpy(pdu_out->ssn, buffer + offset, SSN_LENGTH);
+    pdu_out->type = buffer[offset++];  // Type (1 byte)
+    memcpy(pdu_out->ssn, buffer + offset, SSN_LENGTH); // SSN (12 bytes)
     offset += SSN_LENGTH;
-
-    // Ensure SSN is null-terminated IMPORTANT!!
-    pdu_out->ssn[SSN_LENGTH] = '\0';
-    printf("SSN: %s (offset: %zu)\n", pdu_out->ssn, offset);
 
     return true;
 }
 
+/*
+	####LOOOOKUP###
+*/
 static void lookup_value(Node* node, struct VAL_LOOKUP_PDU* pdu) {
     if (!node || !pdu || !node->hash_table) {
         fprintf(stderr, "Invalid arguments to lookup_value\n");
@@ -302,7 +319,6 @@ static void lookup_value(Node* node, struct VAL_LOOKUP_PDU* pdu) {
     }
 
     uint8_t hash_value = hash_ssn(pdu->ssn);
-
     printf("Hash value: %d\n", hash_value);
 
     // Check if the hash value falls within this node's range
@@ -313,63 +329,96 @@ static void lookup_value(Node* node, struct VAL_LOOKUP_PDU* pdu) {
         Entry* entry = ht_lookup(node->hash_table, pdu->ssn);
         if (!entry) {
             printf("Entry with SSN %.12s not found in the hash table\n", pdu->ssn);
-            // Send a response indicating the entry was not found
-            if (node->sockfd_b > 0) {
-                send_val_lookup_response(NULL, node->sockfd_b);
-            } else {
-                fprintf(stderr, "Invalid socket descriptor for response\n");
-            }
-            return;
+			//Skill issue write correctly i try and fix this later, wasn't implemented in the rust code
         }
 
-        // Log the found entry
         printf("Found entry with SSN: %.12s\n", entry->ssn);
         printf("Name: %.*s\n", entry->name_length, entry->name);
         printf("Email: %.*s\n", entry->email_length, entry->email);
 
+        // Prepare the response PDU
+        struct VAL_LOOKUP_RESPONSE_PDU response_pdu = {0};
+        response_pdu.type = VAL_LOOKUP_RESPONSE;
+        memcpy(response_pdu.ssn, entry->ssn, SSN_LENGTH);
+        response_pdu.name_length = entry->name_length;
+        response_pdu.name = entry->name;
+        response_pdu.email_length = entry->email_length;
+        response_pdu.email = entry->email;
+
         // Send the response for the found entry
-        if (node->sockfd_b > 0) {
-            send_val_lookup_response(entry, node->sockfd_b);
-            if (false) { 
-                perror("Failed to send VAL_LOOKUP response");
-            } else {
-                printf("Lookup response sent for SSN: %.12s\n", pdu->ssn);
-            }
-        } else {
-            fprintf(stderr, "Invalid socket descriptor for response\n");
-        }
+        struct sockaddr_in client_addr;
+        memset(&client_addr, 0, sizeof(client_addr));
+        client_addr.sin_family = AF_INET;
+        client_addr.sin_addr.s_addr = pdu->sender_address;
+        client_addr.sin_port = htons(pdu->sender_port); // Convert to network byte order
+        send_lookup_response(node, &response_pdu, &client_addr);
     } else {
         // Forward the lookup request to the successor
         printf("Forwarding VAL_LOOKUP to successor\n");
 
-        size_t pdu_size = 1 + SSN_LENGTH;
+        size_t pdu_size = 1 + SSN_LENGTH + sizeof(uint32_t) + sizeof(uint16_t);
         uint8_t* out_buffer = malloc(pdu_size);
         if (!out_buffer) {
             perror("Memory allocation failed for PDU buffer");
             return;
         }
 
-        // Build the PDU
         size_t offset = 0;
-        out_buffer[offset++] = pdu->type;
+        out_buffer[offset++] = VAL_LOOKUP;
         memcpy(out_buffer + offset, pdu->ssn, SSN_LENGTH);
         offset += SSN_LENGTH;
 
-        // Send the PDU
-        if (node->sockfd_b > 0) {
-            int send_status = send(node->sockfd_b, out_buffer, pdu_size, 0);
-            if (send_status == -1) {
-                perror("send failure");
-            } else {
-                printf("VAL_LOOKUP forwarded to successor\n");
-            }
+		// Write the sender address (32-bit value) into the buffer
+		memcpy(out_buffer + offset, &pdu->sender_address, sizeof(uint32_t));
+		offset += sizeof(uint32_t); // Move the offset forward by the size of a 32-bit value
+
+		// Write the sender port (16-bit value) into the buffer, converting to network byte order
+		uint16_t network_port = htons(pdu->sender_port);
+		memcpy(out_buffer + offset, &network_port, sizeof(uint16_t));
+		offset += sizeof(uint16_t); // Move the offset forward by the size of a 16-bit value
+
+        int send_status = send(node->sockfd_b, out_buffer, pdu_size, 0);
+        if (send_status == -1) {
+            perror("send failure");
         } else {
-            fprintf(stderr, "Invalid socket descriptor for forwarding\n"); // Here we get fucked, the socket is bad so try and fix it
+            printf("VAL_LOOKUP forwarded to successor\n");
         }
 
         free(out_buffer);
     }
 }
+
+static void send_lookup_response(Node* node, struct VAL_LOOKUP_RESPONSE_PDU* response_pdu, struct sockaddr_in* client_addr) {
+    // Calculate the total size of the PDU buffer
+    size_t pdu_size = 1 + SSN_LENGTH + 1 + response_pdu->name_length + 1 + response_pdu->email_length;
+    uint8_t* out_buffer = malloc(pdu_size);
+    if (!out_buffer) {
+        perror("Memory allocation failed for PDU buffer");
+        return;
+    }
+    size_t offset = 0;
+    out_buffer[offset++] = response_pdu->type;
+    memcpy(out_buffer + offset, response_pdu->ssn, SSN_LENGTH);
+    offset += SSN_LENGTH;
+
+    out_buffer[offset++] = response_pdu->name_length;
+    memcpy(out_buffer + offset, response_pdu->name, response_pdu->name_length);
+    offset += response_pdu->name_length;
+
+    out_buffer[offset++] = response_pdu->email_length;
+    memcpy(out_buffer + offset, response_pdu->email, response_pdu->email_length);
+    offset += response_pdu->email_length;
+
+    int send_status = sendto(node->sockfd_a, out_buffer, pdu_size, 0, (struct sockaddr*)client_addr, sizeof(*client_addr));
+    if (send_status == -1) {
+        perror("sendto failure");
+    } else {
+        printf("Response sent successfully\n");
+    }
+
+    free(out_buffer);
+}
+
 
 static bool parse_val_lookup_pdu(const uint8_t* buffer, struct VAL_LOOKUP_PDU* pdu_out) {
     size_t offset = 0;
@@ -381,57 +430,41 @@ static bool parse_val_lookup_pdu(const uint8_t* buffer, struct VAL_LOOKUP_PDU* p
     memcpy(pdu_out->ssn, buffer + offset, SSN_LENGTH);
     offset += SSN_LENGTH;
 
-    // Ensure SSN is null-terminated IMPORTANT!!
-    pdu_out->ssn[SSN_LENGTH] = '\0';
-    printf("SSN: %s (offset: %zu)\n", pdu_out->ssn, offset);
+    // Print SSN for debugging
+    printf("SSN: ");
+    for (size_t i = 0; i < SSN_LENGTH; i++) {
+        printf("%c", pdu_out->ssn[i]);
+    }
+    printf(" (offset: %zu)\n", offset);
+
+	// Copy the sender address (32-bit value) from the buffer
+	memcpy(&pdu_out->sender_address, buffer + offset, sizeof(uint32_t));
+	offset += sizeof(uint32_t);
+
+	// Copy the sender port (16-bit value) from the buffer and convert from network byte order
+	uint16_t network_port;
+	memcpy(&network_port, buffer + offset, sizeof(uint16_t));
+	pdu_out->sender_port = ntohs(network_port);
+	offset += sizeof(uint16_t);
 
     return true;
 }
+/*
+htons (Host to Network Short)
+ntohs (Network to Host Short)
+sockfd_a is the UDP socket
+*/
+/*There are many implicit and explicit rules of the distributed hash table, some
+of the most important ones are listed below.
 
-void send_val_lookup_response(const struct Entry* entry, int socket_fd) {
-    uint8_t response_buffer[1024];
-    size_t offset = 0;
+Only one insertion of a node is performed at a time.
+SSN is represented as 12-bytes, YYYYMMDDXXXX, no null termination.
+Name and email fields are at most 255 characters, no null termination.
+Invalid PDUs can be dropped without response.
+All port fields are transmitted in network byte order, also known as big-endian.
 
-    // Type (1 byte)
-    response_buffer[offset++] = VAL_LOOKUP_RESPONSE;
+It is crucial that you handle this correctly, as the communication will not function
+if there is cross-network varying byte order.
+Check the htons and ntohs functions in C
 
-    // SSN (12 bytes)
-    if (entry) {
-        memcpy(response_buffer + offset, entry->ssn, SSN_LENGTH);
-    } else {
-        memset(response_buffer + offset, 0, SSN_LENGTH);
-    }
-    offset += SSN_LENGTH;
-
-    // Name Length (1 byte)
-    if (entry) {
-        response_buffer[offset++] = entry->name_length;
-    } else {
-        response_buffer[offset++] = 0;
-    }
-
-    // Name (variable length)
-    if (entry) {
-        memcpy(response_buffer + offset, entry->name, entry->name_length);
-        offset += entry->name_length;
-    }
-
-    // Email Length (1 byte)
-    if (entry) {
-        response_buffer[offset++] = entry->email_length;
-    } else {
-        response_buffer[offset++] = 0;
-    }
-
-    // Email (variable length)
-    if (entry) {
-        memcpy(response_buffer + offset, entry->email, entry->email_length);
-        offset += entry->email_length;
-    }
-
-    // Send the response
-    int send_status = send(socket_fd, response_buffer, offset, 0);
-    if (send_status == -1) {
-        perror("sendto failure");
-    }
-}
+Note: It is assumed that no PDU sent over UDP can get corrupted or get dropped.*/
