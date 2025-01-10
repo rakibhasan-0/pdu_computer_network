@@ -63,12 +63,6 @@ queue_t* queue_create(int capacity) {
     q->capacity = capacity;
     q->destroyed = 0;
 
-    if (pthread_mutex_init(&q->lock, NULL) != 0) {
-        perror("Failed to initialize mutex for queue");
-        free(q->items);
-        free(q);
-        exit(EXIT_FAILURE);
-    }
 
     // Initialize all items to NULL
     for (int i = 0; i < capacity; i++) {
@@ -139,7 +133,6 @@ void* queue_dequeue(queue_t* q) {
 
     if (q->size == 0) {
         fprintf(stderr, "Queue is empty. Cannot dequeue.\n");
-        pthread_mutex_unlock(&q->lock);
         return NULL;
     }
 
@@ -177,7 +170,7 @@ void queue_destroy(queue_t* q) {
 
     q->destroyed = 1; // Set the flag to indicate the queue is destroyed
 
-    printf("Destroying queue with capacity: %d, size: %d\n", q->capacity, q->size);
+    //printf("Destroying queue with capacity: %d, size: %d\n", q->capacity, q->size);
 
     // Free all items in the queue
     if (q->items != NULL) {
@@ -188,13 +181,12 @@ void queue_destroy(queue_t* q) {
                 q->items[i] = NULL; // Set to NULL after freeing
             }
         }*/
-        printf("Freeing items array\n");
+        //printf("Freeing items array\n");
         free(q->items);
         q->items = NULL; // Set to NULL after freeing
     }
 
-    pthread_mutex_destroy(&q->lock);
-    printf("Freeing queue structure\n");
+    //printf("Freeing queue structure\n");
     free(q);
 }
 

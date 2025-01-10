@@ -47,7 +47,7 @@ static void close_connection (Node* node){
             perror("close sockfd_d failed");
         }
     }
-	printf("Meme test\n");
+	//printf("Meme test\n");
     // we may need to deallocate the memory here.
     destroy_allocated_memory(node);
 
@@ -62,7 +62,7 @@ static void close_connection (Node* node){
 int q10_state(void* n, void* data) {
 
     Node* node = (Node*)n;
-    printf("\n[q10 state]\n");
+    printf("\n[Q10 state]\n");
 
     if(node->successor_ip_address.s_addr == INADDR_NONE && node->successor_port == 0){
         printf("I am the only node in the network. Exiting...\n");
@@ -103,7 +103,7 @@ void register_signal_handlers(){
 // state 11, we will handle that state when there are predecessor and successor for the node.
 
 int q11_state(void* n, void* data) {
-    printf("[q11 state]\n");
+    printf("[Q11 state]\n");
 
     Node* node = (Node*)n;
 
@@ -158,7 +158,7 @@ int q11_state(void* n, void* data) {
     }
 
     printf("Received NET_NEW_RANGE_RESPONSE\n");
-    printf("net_new_range_response type: %d\n", net_new_range_response.type);
+    //printf("net_new_range_response type: %d\n", net_new_range_response.type);
 
     if (net_new_range_response.type == NET_NEW_RANGE_RESPONSE) {
         printf("Received NET_NEW_RANGE_RESPONSE. Moving to STATE_18.\n");
@@ -171,7 +171,7 @@ int q11_state(void* n, void* data) {
 // state 15, where we will update the hash range dynamically and decide the response target.
 int q15_state(void* n, void* data) {
 
-    printf("[q15 state]\n");
+    printf("[Q15 state]\n");
 
     Node* node = (Node*)n;
     struct NET_NEW_RANGE_PDU* net_new_range = (struct NET_NEW_RANGE_PDU*)data;
@@ -228,7 +228,7 @@ int q15_state(void* n, void* data) {
 // the Q18 state, where we will close the connection with the predecessor and successor and exit gracefully.
 int q18_state(void* n, void* data){
 
-    printf("[q18 state]\n");
+    printf("[Q18 state]\n");
 
     Node* node = (Node*)n;
 
@@ -280,18 +280,18 @@ int q18_state(void* n, void* data){
 
     // now we will close the connection with the predecessor and successor.
     close_connection(node);
-	printf("Meme test33\n");
+	//printf("Meme test33\n");
     exit(0);
 }
 
 // The Q16 state, where the node will receive the NET_LEAVING message from the leaving node.
 int q16_state(void* n, void* data){
-    printf("[q16 state]\n");
+    printf("[Q16 state]\n");
     Node* node = (Node*)n;
     struct NET_LEAVING_PDU* net_leaving = (struct NET_LEAVING_PDU*)data;
 
     printf("Received NET_LEAVING message from the leaving node\n");
-    printf("Old successor: %s:%d\n", inet_ntoa(node->successor_ip_address), node->successor_port);
+    //printf("Old successor: %s:%d\n", inet_ntoa(node->successor_ip_address), node->successor_port);
 
     struct in_addr new_successor_addr;
     new_successor_addr.s_addr = net_leaving->new_address;
@@ -318,7 +318,10 @@ int q16_state(void* n, void* data){
         node->successor_ip_address.s_addr = INADDR_NONE;
         node->successor_port = 0;
         node->sockfd_b = -1;
-        printf("Now moving to state 6 as there is no successor.\n");
+        //printf("I am alone in the network\n");
+        
+        return 0;
+
     } else {
         struct sockaddr_in addr = {0};
         addr.sin_family = AF_INET;

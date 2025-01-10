@@ -32,7 +32,7 @@ static int serialize_net_join(struct NET_JOIN_PDU* pdu, char* buffer){
 int q4_state(void* n, void* data){
 
     Node* node = (Node*)n;
-    printf("[q4 state]\n");
+    printf("[Q4 state]\n");
     // the node itself will be its predecessor and successor
     // the initialization of the 
     node->predecessor_ip_address.s_addr = INADDR_NONE;
@@ -62,7 +62,7 @@ int q4_state(void* n, void* data){
 // what I think i will start traversing the networ from the node that we got from the tracker.
 // we will make the node the predecessor the founded node of the node.
 int q7_state(void* n, void* data) {
-    printf("[q7 state]\n");
+    printf("[Q7 state]\n");
     printf("I am not the first node, sending NET_JOIN message...\n");
 
     struct NET_GET_NODE_RESPONSE_PDU* net_get_node_response = (struct NET_GET_NODE_RESPONSE_PDU*)data;
@@ -73,8 +73,8 @@ int q7_state(void* n, void* data) {
     net_join.type = NET_JOIN;
 
     // As we have already received host order or converted to host order in q3_state
-    printf("if we ntohs the port %d\n", ntohs(node->port));
-    printf("if we htonl the port %d\n", htons(node->port));
+    //printf("if we ntohs the port %d\n", ntohs(node->port));
+    //printf("if we htonl the port %d\n", htons(node->port));
 
     net_join.src_address = node->public_ip.s_addr;  
     net_join.src_port = node->port;
@@ -147,15 +147,15 @@ int q7_state(void* n, void* data) {
 
     // --- Deserialize into the struct ---
     deserialize_net_join_response(net_join_response, buffer_net_join_response);
-    printf("the net join response port is %d\n", net_join_response->next_port);
+    //printf("the net join response port is %d\n", net_join_response->next_port);
 
     printf("Received NET_JOIN_RESPONSE from predecessor\n");
     node->hash_range_start= net_join_response->range_start;
     node->hash_range_end = net_join_response->range_end;
     node->hash_span = calulate_hash_span(node->hash_range_start, node->hash_range_end);
 
-    printf("the port from the net join response is %d\n", net_join_response->next_port);
-    printf("the port after being converted to host order %d\n", net_join_response->next_port);
+    //printf("the port from the net join response is %d\n", net_join_response->next_port);
+    //printf("the port after being converted to host order %d\n", net_join_response->next_port);
  
     // Move to q8_state
     node->state_handler = state_handlers[STATE_8];
@@ -167,7 +167,7 @@ int q7_state(void* n, void* data) {
 
 
 int q8_state(void* n, void* data) {
-    printf("[q8 state]\n");
+    printf("[Q8 state]\n");
 
     Node* node = (Node*)n;
     struct NET_JOIN_RESPONSE_PDU* net_join_response = (struct NET_JOIN_RESPONSE_PDU*)data;
@@ -200,7 +200,7 @@ int q8_state(void* n, void* data) {
     node->successor_ip_address = addr.sin_addr;
     node->successor_port = net_join_response->next_port;
 	
-	printf("Freeing net_join_response in join_network.c\n");
+	//printf("Freeing net_join_response in join_network.c\n");
     free(net_join_response);
 
     node->state_handler = state_handlers[STATE_6];
@@ -210,7 +210,7 @@ int q8_state(void* n, void* data) {
 }
 
 static void deserialize_net_join_response(struct NET_JOIN_RESPONSE_PDU* pdu, const char* buffer){
-    printf("Deserializing NET_JOIN_RESPONSE_PDU\n");
+    //printf("Deserializing NET_JOIN_RESPONSE_PDU\n");
     size_t offset = 0;
     pdu->type = buffer[offset];
     offset += sizeof(pdu->type);

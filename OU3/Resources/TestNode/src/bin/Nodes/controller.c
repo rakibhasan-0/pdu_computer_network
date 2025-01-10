@@ -17,7 +17,7 @@ void deserialize_net_join(struct NET_JOIN_PDU* net_join, const char* buffer);
 // based on the graph, I(gazi) think that state_6 kinda core since most states are being handled from here.
 int q6_state(void* n, void* data) {
     Node* node = (Node*)n;
-    printf("[q6 state]\n");
+    printf("[Q6 state]\n");
 	
     static char udp_buffer[4096];
     static char successor_buffer[1024 * 1024];
@@ -59,7 +59,7 @@ int q6_state(void* n, void* data) {
         time_t current_time = time(NULL);
 
         if (current_time - last_time >= timeout) {
-            printf("the number of entries in the hash table is %d\n", node->hash_table->length);
+            printf("Q[6] %d entries stored \n", node->hash_table->length);
             int send_status = sendto(node->sockfd_a, &net_alive, sizeof(net_alive), 0, node->tracker_addr->ai_addr, node->tracker_addr->ai_addrlen);
             if (send_status == -1) {
                 perror("send failure");
@@ -242,59 +242,59 @@ static void process_queue(Node* node) {
         PDU* pdu = queue_dequeue(node->queue);
         if (pdu) {
             manage_pdu(node, pdu);
-            printf("Freeing PDU of size MEME: %zu bytes\n", sizeof(PDU));
+            //printf("Freeing PDU of size MEME: %zu bytes\n", sizeof(PDU));
             free(pdu);
         }
     }
 }
 
 static void manage_pdu(Node* node, PDU* pdu) {
-    printf("Managing PDU of type: %d, size: %zu bytes\n", pdu->type, pdu->size);
+    //printf("Managing PDU of type: %d, size: %zu bytes\n", pdu->type, pdu->size);
     switch (pdu->type) {
         case NET_LEAVING:
-            printf("  NET_LEAVING_PDU: Freeing PDU buffer of size: %zu bytes\n", pdu->size);
+            //printf("  NET_LEAVING_PDU: Freeing PDU buffer of size: %zu bytes\n", pdu->size);
             struct NET_LEAVING_PDU net_leave = {0};
             deserialize_net_leave(&net_leave, pdu->buffer, pdu->size);
-            printf("Received NET_LEAVING PDU\n");
+            //printf("Received NET_LEAVING PDU\n");
             node->state_handler = state_handlers[STATE_16];
             node->state_handler(node, &net_leave);
-            printf("Processed NET_LEAVING PDU\n");
+            //printf("Processed NET_LEAVING PDU\n");
             break;
         case NET_NEW_RANGE:
-            printf("  NET_NEW_RANGE_PDU: Processing\n");
+            //printf("  NET_NEW_RANGE_PDU: Processing\n");
             struct NET_NEW_RANGE_PDU net_new_range = {0};
             deserialize_net_new_range(&net_new_range, pdu->buffer);
             node->state_handler = state_handlers[STATE_15];
             node->state_handler(node, &net_new_range);
-            printf("Processed NET_NEW_RANGE PDU\n");
+            //printf("Processed NET_NEW_RANGE PDU\n");
             break;
         case VAL_INSERT:
         case VAL_REMOVE:
         case VAL_LOOKUP:
-            printf("  VAL_PDU: Processing\n");
+            //printf("  VAL_PDU: Processing\n");
             node->state_handler = state_handlers[STATE_9];
             node->state_handler(node, pdu);
-            printf("Processed VAL PDU\n");
+            //printf("Processed VAL PDU\n");
             break;
         case NET_JOIN:
-            printf("  NET_JOIN_PDU: Freeing PDU buffer of size: %zu bytes\n", pdu->size);
+            //printf("  NET_JOIN_PDU: Freeing PDU buffer of size: %zu bytes\n", pdu->size);
             struct NET_JOIN_PDU net_join;
             deserialize_net_join(&net_join, pdu->buffer);
             node->state_handler = state_handlers[STATE_12];
             node->state_handler(node, &net_join);
-            printf("Processed NET_JOIN PDU\n");
+            //printf("Processed NET_JOIN PDU\n");
             break;
         case NET_CLOSE_CONNECTION:
-            printf("  NET_CLOSE_CONNECTION: Freeing PDU buffer of size: %zu bytes\n", pdu->size);
+            //printf("  NET_CLOSE_CONNECTION: Freeing PDU buffer of size: %zu bytes\n", pdu->size);
             node->state_handler = state_handlers[STATE_17];
             node->state_handler(node, pdu);
-            printf("Processed NET_CLOSE_CONNECTION PDU\n");
+            //printf("Processed NET_CLOSE_CONNECTION PDU\n");
             break;
         default:
             printf("Unknown PDU type: %u\n", pdu->type);
             break;
     }
-    printf("22Freeing PDU buffer of size: %zu bytes\n", pdu->size);
+    //printf("22Freeing PDU buffer of size: %zu bytes\n", pdu->size);
     //free(pdu->buffer);
 }
 
