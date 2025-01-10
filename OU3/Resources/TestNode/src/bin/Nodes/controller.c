@@ -97,7 +97,7 @@ int q6_state(void* n, void* data) {
 
                     struct PDU pdu;
                     pdu.type = udp_buffer[0];
-                    pdu.data = udp_buffer;
+                    //pdu.data = udp_buffer;
                     memcpy(pdu.buffer, udp_buffer, bytes_recv);
                     manage_pdu(node, &pdu);
 				// TCP socket for the successor 
@@ -141,7 +141,7 @@ int q6_state(void* n, void* data) {
 
                         pdu->size = pdu_size;
                         pdu->type = pdu_type;
-                        pdu->data = successor_buffer + offset;
+                        //pdu->data = successor_buffer + offset;
                         memcpy(pdu->buffer, successor_buffer + offset, pdu_size);
                         queue_enqueue(node->queue, pdu);
                         memset(successor_buffer + offset, 0, pdu_size);
@@ -191,7 +191,7 @@ int q6_state(void* n, void* data) {
                         PDU* pdu = malloc(sizeof(PDU));
                         pdu->size = pdu_size;
                         pdu->type = pdu_type;
-                        pdu->data = predecessor_buffer + offset;
+                        //pdu->data = predecessor_buffer + offset;
                         memcpy(pdu->buffer, predecessor_buffer + offset, pdu_size);
                         queue_enqueue(node->queue, pdu);
                         memset(predecessor_buffer + offset, 0, pdu_size);
