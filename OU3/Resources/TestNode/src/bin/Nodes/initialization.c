@@ -6,7 +6,7 @@
 int q1_state(void* n, void* data) {
     Node* node = (Node*)n;
 
-    printf("[q1 state]\n");
+    printf("[Q1 state]\n");
     struct STUN_LOOKUP_PDU stun_lookup;
     memset(&stun_lookup, 0, sizeof(stun_lookup));
     stun_lookup.type = STUN_LOOKUP;
@@ -86,7 +86,7 @@ int q2_state(void* n, void* data){
 
     Node* node = (Node*)n;
     // we will create a buffer to store the response from the tracker
-    printf("[q2 state]\n");
+    printf("[Q2 state]\n");
     char buffer[1024];
     // nullify the buffer
     memset(buffer, 0, sizeof(buffer));
@@ -126,7 +126,7 @@ int q2_state(void* n, void* data){
 int q3_state(void* n, void* data){
 
     Node* node = (Node*)n;
-    printf("[q3 state]\n");
+    printf("[Q3 state]\n");
     // we will send NET_GET_NODE to the tracker
     struct NET_GET_NODE_PDU net_get_node = {0};
     // just for check if the public ip is stored in the node
