@@ -34,7 +34,7 @@ static void send_lookup_response(Node* node, struct VAL_LOOKUP_RESPONSE_PDU* res
 
 int q9_state(void* n, void* data) {
     Node* node = (Node*)n;
-    //printf("[Q9 state]\n");sds
+    printf("[Q9 state]\n");
 
     // now we will transfer data into the queue as we have inserted data into the queue in the state 6.
     
@@ -52,7 +52,7 @@ int q9_state(void* n, void* data) {
 
         case VAL_INSERT:
             struct VAL_INSERT_PDU pdu_insert = {0};
-			printf("Current sockfd_b insert: %d\n", node->sockfd_b);
+			//printf("Current sockfd_b insert: %d\n", node->sockfd_b);
             // Parse the buffer into the PDU structure of the VAL_INSERT_PDU type
             if(parse_val_insert_pdu(pdu->buffer, &pdu_insert)) {
                 insertion_of_value(node, &pdu_insert);
@@ -63,19 +63,19 @@ int q9_state(void* n, void* data) {
             break;
 
         case VAL_REMOVE:
-            printf("Handling VAL_REMOVE\n");
+            //printf("Handling VAL_REMOVE\n");
 			struct VAL_REMOVE_PDU val_remove_pdu;
 			if (parse_val_remove_pdu(pdu->buffer, &val_remove_pdu)) {
-				printf("SSN: %s\n", val_remove_pdu.ssn);
+				//printf("SSN: %s\n", val_remove_pdu.ssn);
 				remove_value(node, &val_remove_pdu);
 			}
             break;
         case VAL_LOOKUP: 
-            printf("Handling VAL_LOOKUP\n");
+            //printf("Handling VAL_LOOKUP\n");
 			struct VAL_LOOKUP_PDU val_lookup_pdu;
-			printf("Current sockfd_b lookup: %d\n", node->sockfd_b);
+			//printf("Current sockfd_b lookup: %d\n", node->sockfd_b);
 			if (parse_val_lookup_pdu(pdu->buffer, &val_lookup_pdu)) {
-				printf("SSN: %s\n", val_lookup_pdu.ssn);
+				//printf("SSN: %s\n", val_lookup_pdu.ssn);
 				lookup_value(node, &val_lookup_pdu);
 			}
         
@@ -105,7 +105,9 @@ static void insertion_of_value(Node* node, struct VAL_INSERT_PDU* pdu) {
 
     //printf("Hash value: %d\n", hash_value);
     if (hash_value >= node->hash_range_start && hash_value <= node->hash_range_end) {
-        printf("Inserting value with SSN: %.12s\n", pdu->ssn);
+        printf("Inserting value with { SSN:  %.12s", pdu->ssn);
+        printf(", Name: %.*s", pdu->name_length, pdu->name);
+        printf(", Email: %.*s } \n", pdu->email_length, pdu->email);
 
         Entry* entry = (Entry*)malloc(sizeof(Entry));
         if (!entry) {
@@ -261,11 +263,11 @@ static void remove_value(Node* node, struct VAL_REMOVE_PDU* pdu) {
     }
 
     uint8_t hash_value = hash_ssn((char *)pdu->ssn);
-    printf("Hash value: %d\n", hash_value);
+    //printf("Hash value: %d\n", hash_value);
 
     // Check if the hash value falls within this node's range
     if (hash_value >= node->hash_range_start && hash_value <= node->hash_range_end) {
-        printf("Removing value with SSN: %.12s\n", pdu->ssn);
+        //printf("Removing value with SSN: %.12s\n", pdu->ssn);
 
         // Remove the entry from the hash table
         ht_remove(node->hash_table, (char *)pdu->ssn);
@@ -323,7 +325,7 @@ static void lookup_value(Node* node, struct VAL_LOOKUP_PDU* pdu) {
 
     // Check if the hash value falls within this node's range
     if (hash_value >= node->hash_range_start && hash_value <= node->hash_range_end) {
-        printf("Looking up value with SSN: %.12s\n", pdu->ssn);
+        //printf("Looking up value with SSN: %.12s\n", pdu->ssn);
 
         // Find the entry in the hash table
         Entry* entry = ht_lookup(node->hash_table, pdu->ssn);
@@ -370,9 +372,9 @@ static void lookup_value(Node* node, struct VAL_LOOKUP_PDU* pdu) {
 
         else{
 
-            printf("Found entry with SSN: %.12s\n", entry->ssn);
-            printf("Name: %.*s\n", entry->name_length, entry->name);
-            printf("Email: %.*s\n", entry->email_length, entry->email);
+            printf("Found entry with SSN:{ %.12s ", entry->ssn);
+            printf(", Name: %.*s", entry->name_length, entry->name);
+            printf(",  Email: %.*s } \n", entry->email_length, entry->email);
 
             // Prepare the response PDU
             struct VAL_LOOKUP_RESPONSE_PDU response_pdu = {0};
@@ -469,19 +471,16 @@ static void send_lookup_response(Node* node, struct VAL_LOOKUP_RESPONSE_PDU* res
 static bool parse_val_lookup_pdu(const uint8_t* buffer, struct VAL_LOOKUP_PDU* pdu_out) {
     size_t offset = 0;
 
-    printf("Parsing PDU for lookup\n");
+    //printf("Parsing PDU for lookup\n");
     pdu_out->type = buffer[offset++];
-    printf("Type: %d (offset: %zu)\n", pdu_out->type, offset);
+    //printf("Type: %d (offset: %zu)\n", pdu_out->type, offset);
 
     memcpy(pdu_out->ssn, buffer + offset, SSN_LENGTH);
     offset += SSN_LENGTH;
 
     // Print SSN for debugging
-    printf("SSN: ");
-    for (size_t i = 0; i < SSN_LENGTH; i++) {
-        printf("%c", pdu_out->ssn[i]);
-    }
-    printf(" (offset: %zu)\n", offset);
+    //printf("SSN: ");
+    //printf(" (offset: %zu)\n", offset);
 
 	// Copy the sender address (32-bit value) from the buffer
 	memcpy(&pdu_out->sender_address, buffer + offset, sizeof(uint32_t));

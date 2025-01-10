@@ -52,7 +52,7 @@ uint8_t* constructing_insert_pdu (struct VAL_INSERT_PDU* pdu, size_t pdu_size){
 void transfer_upper_half(void* node, uint8_t range_start, uint8_t range_end){
 
     Node* n = (Node*)node;
-    printf("[transfer_upper_half]\n");
+    //printf("[transfer_upper_half]\n");
 
     char* entries_to_transfer[1024];
     int entries_count = 0; 
@@ -63,7 +63,7 @@ void transfer_upper_half(void* node, uint8_t range_start, uint8_t range_end){
         while(current_entry != NULL){
             Entry* entry = (Entry*)current_entry->value;
             uint8_t hash_value = hash_ssn(entry->ssn);
-            printf("Hash value: %d\n", hash_value);
+            //printf("Hash value: %d\n", hash_value);
 
             if(hash_value >= range_start && hash_value <= range_end){
                 entries_to_transfer[entries_count++] = entry->ssn;
@@ -98,6 +98,10 @@ void transfer_upper_half(void* node, uint8_t range_start, uint8_t range_end){
     for(int i = 0; i < entries_count; i++){
         char* ssn = entries_to_transfer[i];
         Entry* entry = (Entry*)ht_lookup(n->hash_table, ssn);
+        
+        printf("Tranferring entry with { SSN: %.12s", entry->ssn);
+        printf(", Name: %.*s", entry->name_length, entry->name);
+        printf(", Email: %.*s }\n", entry->email_length, entry->email);
 
         struct VAL_INSERT_PDU val_insert = {0};
         val_insert.type = VAL_INSERT;
@@ -133,7 +137,7 @@ void transfer_upper_half(void* node, uint8_t range_start, uint8_t range_end){
         //free(entry);
     }
 
-    printf("Transferring %d entries to the successor\n", entries_count);
+    //printf("Transferring %d entries to the successor\n", entries_count);
     free(buffer_to_store_all_entries);
 
 
@@ -144,7 +148,7 @@ void transfer_upper_half(void* node, uint8_t range_start, uint8_t range_end){
 void transfer_all_entries(void* n, bool to_successor){
 
     Node* noed = (Node*)n;
-    printf("[transfer_all_entries]\n");
+    //printf("[transfer_all_entries]\n");
 
     // get the existing entries from the hash table.
     // I will think about it, whether we need to use dynamic memory allocation or not for the entries.
@@ -186,6 +190,10 @@ void transfer_all_entries(void* n, bool to_successor){
     for(int i = 0; i < entries_count; i++){
         char* ssn = entries_to_transfer[i];
         Entry* entry = (Entry*)ht_lookup(noed->hash_table, ssn);
+
+        printf("Tranferring entry with { SSN: %.12s", entry->ssn);
+        printf(", Name: %.*s", entry->name_length, entry->name);
+        printf(", Email: %.*s }\n", entry->email_length, entry->email);
 
         struct VAL_INSERT_PDU val_insert = {0};
         val_insert.type = VAL_INSERT;
@@ -236,15 +244,15 @@ void transfer_all_entries(void* n, bool to_successor){
 
 void destroy_allocated_memory(void* n){
     Node* node = (Node*)n;
-	printf("[destroy_allocated_memory]\n");
+	//printf("[destroy_allocated_memory]\n");
     if(node->hash_table){
         ht_destroy(node->hash_table);
     }
-	printf("Meme tes2t\n");
+	//printf("Meme tes2t\n");
     if(node->queue){
         queue_destroy(node->queue);
     }
     freeaddrinfo(node->tracker_addr);
     free(node);
-	printf("Memory destroyed\n");
+	//printf("Memory destroyed\n");
 }
